@@ -1,7 +1,32 @@
-# TODO: Configure Celery with Redis
-# For now, just a placeholder
+import os
+
+from celery import Celery
+
+# Configure Celery
+REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
+
+celery_app = Celery(
+    "promoai_rag",
+    broker=REDIS_URL,
+    backend=REDIS_URL,
+    include=["workers.tasks.parse", "workers.tasks.chunk"],
+)
+
+# Celery configuration
+celery_app.conf.update(
+    task_serializer="json",
+    accept_content=["json"],
+    result_serializer="json",
+    timezone="UTC",
+    enable_utc=True,
+    task_track_started=True,
+    task_time_limit=30 * 60,  # 30 minutes
+    task_soft_time_limit=25 * 60,  # 25 minutes
+    worker_prefetch_multiplier=1,
+    worker_max_tasks_per_child=1000,
+)
 
 
-def create_celery_app() -> None:
-    # TODO: Implement Celery configuration
-    pass
+def create_celery_app() -> Celery:
+    """Create and return Celery app instance."""
+    return celery_app

@@ -1,11 +1,31 @@
+from typing import Optional
+
 from pydantic import BaseModel
 
 
-class IngestResponse(BaseModel):
-    job_id: str
-    status: str
-
-
 class IngestRequest(BaseModel):
-    # TODO: Add fields as needed
-    pass
+    """Request model for document ingestion."""
+
+    tenant_id: Optional[str] = None
+    safe_mode: bool = False
+
+
+class IngestResponse(BaseModel):
+    """Response model for document ingestion."""
+
+    job_id: int
+    status: str
+    message: str = "Document uploaded successfully"
+
+
+class JobStatusResponse(BaseModel):
+    """Response model for job status."""
+
+    job_id: int
+    type: str
+    status: str
+    progress: int
+    error: Optional[str] = None
+    document_id: int
+    created_at: str
+    updated_at: str

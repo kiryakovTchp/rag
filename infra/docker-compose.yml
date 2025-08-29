@@ -3,13 +3,21 @@ services:
   api:
     build: { context: .., dockerfile: infra/Dockerfile.api }
     env_file: ../env.example
-    depends_on: [db, redis]
+    environment:
+      - DATABASE_URL=postgresql+psycopg://postgres:postgres@db:5432/postgres
+      - REDIS_URL=redis://redis:6379
+      - S3_ENDPOINT=http://minio:9000
+    depends_on: [db, redis, minio]
     ports: ["8000:8000"]
     volumes: ["..:/app"]
   worker:
     build: { context: .., dockerfile: infra/Dockerfile.worker }
     env_file: ../env.example
-    depends_on: [db, redis]
+    environment:
+      - DATABASE_URL=postgresql+psycopg://postgres:postgres@db:5432/postgres
+      - REDIS_URL=redis://redis:6379
+      - S3_ENDPOINT=http://minio:9000
+    depends_on: [db, redis, minio]
     volumes: ["..:/app"]
   db:
     image: postgres:16

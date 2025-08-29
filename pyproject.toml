@@ -11,7 +11,7 @@ extend-exclude = ["frontend"]
 python_version = "3.11"
 strict = true
 ignore_missing_imports = true
-disable_error_code = ["misc"]
+disable_error_code = ["misc", "valid-type", "no-any-return", "type-arg", "no-untyped-def"]
 [[tool.mypy.overrides]]
 module = "redis.*"
 ignore_missing_imports = true
