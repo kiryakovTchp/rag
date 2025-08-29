@@ -1,0 +1,17 @@
+# Cursor Rules for PromoAI RAG
+## General
+- Docs/PRs/commits на русском (термины можно на англ).
+- Каждый change обязан описывать: Что сделано; Почему (альтернативы); Как работает; Эффект/риски.
+## Always update
+- PR (What/Why/How/Impact), ADR при архитектурных решениях, Engineering Log.
+## Code & Quality
+- ruff/black/mypy обязательны. Никаких секретов в репо. ENV только через .env.example.
+## Commit Policy
+- Conventional Commits. В теле коммита 3–6 предложений What/Why/How/Impact, ссылки на Issue/ADR.
+## PR Checklist
+- [ ] Что сделано  [ ] Почему (альтернативы)  [ ] Как работает  [ ] Эффект/риски
+- [ ] Обновлены ADR/доки/.env.example  [ ] Тест/скрин/трейс приложены
+## ADR
+- docs/adr/000X-*.md, статус: proposed|accepted|deprecated|superseded.
+## Don'ts
+- Никаких временных костылей без ADR/Issue. Не коммитить бинарники/секреты.
