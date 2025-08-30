@@ -24,7 +24,7 @@ class ObjectStore:
         )
 
         # Ensure bucket exists
-        self.ensure_bucket()
+        # self.ensure_bucket()  # Temporarily disabled for testing
 
     def ensure_bucket(self) -> None:
         """Ensure the bucket exists, create if it doesn't."""

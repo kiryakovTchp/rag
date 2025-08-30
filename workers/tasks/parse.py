@@ -13,7 +13,7 @@ from workers.app import celery_app
 logger = logging.getLogger(__name__)
 
 
-@celery_app.task(bind=True)
+@celery_app.task(bind=True, queue="parse")
 def parse_document(self, document_id: int) -> dict:
     """Parse document into elements."""
     logger.info(f"Starting parse task for document {document_id}")
@@ -111,7 +111,7 @@ def parse_document(self, document_id: int) -> dict:
             # Trigger chunking task
             from workers.tasks.chunk import chunk_document
 
-            chunk_document.delay(document_id)
+            chunk_document.apply_async(args=[document_id], queue="chunk")
             logger.info(f"Triggered chunk task for document {document_id}")
 
             return {

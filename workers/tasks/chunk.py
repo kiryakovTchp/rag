@@ -8,7 +8,7 @@ from workers.app import celery_app
 logger = logging.getLogger(__name__)
 
 
-@celery_app.task(bind=True)
+@celery_app.task(bind=True, queue="chunk")
 def chunk_document(self, document_id: int) -> dict:
     """Chunk document elements into searchable chunks."""
     logger.info(f"Starting chunk task for document {document_id}")

@@ -11,9 +11,9 @@ class TestTablesPDF(unittest.TestCase):
 
         os.environ["S3_ENDPOINT"] = "http://localhost:9000"
         os.environ["S3_REGION"] = "us-east-1"
-        os.environ["S3_BUCKET"] = "test-bucket"
-        os.environ["S3_ACCESS_KEY_ID"] = "test"
-        os.environ["S3_SECRET_ACCESS_KEY"] = "test"
+        os.environ["S3_BUCKET"] = "promoai"
+        os.environ["S3_ACCESS_KEY_ID"] = "minio"
+        os.environ["S3_SECRET_ACCESS_KEY"] = "minio123"
 
         self.table_parser = TableParser()
         self.fixture_path = Path(__file__).parent / "fixtures" / "table.pdf"

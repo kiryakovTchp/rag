@@ -40,5 +40,13 @@ jobs:
       - run: pip install -e . || true
       - run: pre-commit install
       - run: bash scripts/banlist.sh
+      - run: bash scripts/check_wireup.sh
       - run: python -c "import boto3, fitz; print('deps ok')"
-      - run: pytest -q
+      - name: Start API
+        run: python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 &
+      - name: Start Celery Worker
+        run: python -m celery -A workers.app worker -Q parse,chunk --concurrency 1 &
+      - name: Wait for services
+        run: sleep 5
+      - name: Run tests
+        run: pytest -q --maxfail=1

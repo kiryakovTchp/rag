@@ -14,39 +14,34 @@ cp .env.example .env
 pre-commit install
 ```
 
-### 2. Запуск инфраструктуры
+### 2. Запуск полного стека
 
 ```bash
-# Запустить базы данных и MinIO
-docker compose -f infra/docker-compose.yml up -d db redis minio
+# Запустить все сервисы (db, redis, minio, worker, api)
+docker compose -f infra/docker-compose.yml up -d db redis minio worker api
 
 # Или через Makefile
-make dev
+make dev-up
 ```
 
-### 3. Запуск API
-
-```bash
-# Локально
-uvicorn api.main:app --reload --port 8000
-
-# Или через Docker
-docker compose -f infra/docker-compose.yml up api
-```
-
-### 4. Проверка работоспособности
+### 3. Проверка работоспособности
 
 ```bash
 # Проверка здоровья API
 curl http://localhost:8000/healthz
 
-# Загрузка документа
-curl -X POST http://localhost:8000/ingest \
-  -F "file=@test_document.txt" \
-  -F "tenant_id=test"
+# Загрузка PDF документа
+curl -F file=@tests/fixtures/simple.pdf http://localhost:8000/ingest
 
-# Проверка статуса job
+# Проверка статуса job (замените {job_id} на полученный ID)
 curl http://localhost:8000/ingest/{job_id}
+```
+
+### 4. Остановка сервисов
+
+```bash
+# Остановить все сервисы
+make dev-down
 ```
 
 ## Архитектура
@@ -102,6 +97,8 @@ alembic upgrade head
 ### Переменные окружения
 
 Скопируйте `.env.example` в `.env` и настройте:
+             
+             
 
 ```bash
 # База данных
