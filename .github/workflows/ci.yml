@@ -42,6 +42,7 @@ jobs:
       - run: bash scripts/banlist.sh
       - run: bash scripts/check_wireup.sh
       - run: python -c "import boto3, fitz; print('deps ok')"
+      - run: python -m alembic upgrade head
       - name: Start API
         run: python -m uvicorn api.main:app --host 0.0.0.0 --port 8000 &
       - name: Start Celery Worker

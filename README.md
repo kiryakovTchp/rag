@@ -24,7 +24,14 @@ docker compose -f infra/docker-compose.yml up -d db redis minio worker api
 make dev-up
 ```
 
-### 3. Проверка работоспособности
+### 3. Инициализация базы данных
+
+```bash
+# Применить миграции
+alembic upgrade head
+```
+
+### 4. Проверка работоспособности
 
 ```bash
 # Проверка здоровья API
@@ -37,7 +44,7 @@ curl -F file=@tests/fixtures/simple.pdf http://localhost:8000/ingest
 curl http://localhost:8000/ingest/{job_id}
 ```
 
-### 4. Остановка сервисов
+### 5. Остановка сервисов
 
 ```bash
 # Остановить все сервисы

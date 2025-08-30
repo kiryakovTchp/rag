@@ -3,6 +3,27 @@ set -e
 
 echo "🔍 Checking service connectivity..."
 
+# Check for SQLite usage (should fail)
+echo "  Checking for SQLite usage..."
+if grep -r "sqlite\|sqlite3\|aiosqlite\|sqlite:///\|:memory:" api/ services/ workers/ db/ storage/ 2>/dev/null; then
+    echo "    ❌ Found SQLite usage in code"
+    exit 1
+fi
+
+# Check db/session.py contains postgresql+psycopg
+echo "  Checking db/session.py..."
+if ! grep -q "postgresql+psycopg" db/session.py; then
+    echo "    ❌ db/session.py doesn't contain postgresql+psycopg"
+    exit 1
+fi
+
+if grep -q "sqlite" db/session.py; then
+    echo "    ❌ db/session.py contains SQLite references"
+    exit 1
+fi
+
+echo "    ✅ No SQLite usage found"
+
 # Check PostgreSQL
 echo "  Checking PostgreSQL..."
 python3 -c "

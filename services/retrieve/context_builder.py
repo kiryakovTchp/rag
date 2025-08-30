@@ -2,7 +2,7 @@
 
 from typing import List
 
-from services.chunking.token_splitter import TokenSplitter
+from services.chunking.token import TokenTextSplitter
 from services.retrieve.types import ChunkWithScore
 
 
@@ -11,7 +11,7 @@ class ContextBuilder:
     
     def __init__(self):
         """Initialize context builder."""
-        self.token_splitter = TokenSplitter()
+        self.token_splitter = TokenTextSplitter()
     
     def build(self, matches: List[ChunkWithScore], max_ctx_tokens: int) -> List[ChunkWithScore]:
         """Build compact context from matches.
@@ -38,16 +38,13 @@ class ContextBuilder:
         return filtered_matches[:6]  # Max 6 chunks
     
     def _remove_duplicates(self, matches: List[ChunkWithScore]) -> List[ChunkWithScore]:
-        """Remove duplicate chunks by element_id/table_id."""
+        """Remove duplicate chunks by chunk_id."""
         seen = set()
         unique_matches = []
         
         for match in matches:
-            # Create unique key based on doc_id, page, and breadcrumbs
-            key = (match["doc_id"], match["page"], tuple(match["breadcrumbs"]))
-            
-            if key not in seen:
-                seen.add(key)
+            if match["chunk_id"] not in seen:
+                seen.add(match["chunk_id"])
                 unique_matches.append(match)
         
         return unique_matches

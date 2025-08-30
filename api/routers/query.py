@@ -7,7 +7,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import JSONResponse
 
 from api.schemas.query import QueryRequest, QueryResponse, QueryMatch, QueryUsage
-from services.chunking.token_splitter import TokenSplitter
+from services.chunking.token import TokenTextSplitter
 from services.retrieve.dense import DenseRetriever
 from services.retrieve.rerank import WorkersAIReranker
 from services.retrieve.context_builder import ContextBuilder
@@ -29,7 +29,7 @@ async def query(request: QueryRequest) -> QueryResponse:
     # Initialize services
     retriever = DenseRetriever()
     context_builder = ContextBuilder()
-    token_splitter = TokenSplitter()
+    token_splitter = TokenTextSplitter()
     
     # Count input tokens
     in_tokens = token_splitter.count_tokens(request.query)

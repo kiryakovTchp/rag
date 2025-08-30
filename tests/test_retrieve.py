@@ -23,7 +23,7 @@ class TestRetrieve(unittest.TestCase):
         self.db = SessionLocal()
         
         # Set environment variables
-        os.environ["DATABASE_URL"] = "sqlite:///./test.db"
+        os.environ["DATABASE_URL"] = "postgresql+psycopg://postgres:postgres@localhost:5432/postgres"
         os.environ["EMBED_PROVIDER"] = "local"
         os.environ["EMBED_BATCH_SIZE"] = "64"
     
