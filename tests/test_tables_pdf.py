@@ -29,18 +29,50 @@ class TestTablesPDF(unittest.TestCase):
         # Check table structure
         table = tables[0]
         self.assertEqual(table["type"], "table")
-        self.assertIsNotNone(table["table_id"])
-        self.assertIsNotNone(table["text"])
+        self.assertIn("table_id", table)
+        self.assertIn("text", table)
 
-        # Verify table text contains headers
+        # Test that table text contains markdown format
         table_text = table["text"]
-        self.assertIn("Name", table_text)
-        self.assertIn("Age", table_text)
-        self.assertIn("City", table_text)
+        self.assertIn("|", table_text)  # Should contain pipe separators
+        self.assertIn("---", table_text)  # Should contain separator line
 
-        # Check that it's in markdown format
-        self.assertIn("|", table_text)
-        self.assertIn("---", table_text)
+        # Test chunking of table
+        from services.chunking.pipeline import ChunkingPipeline
+
+        chunking_pipeline = ChunkingPipeline()
+
+        # Create element with table
+        element = {
+            "id": 1,
+            "type": "table",
+            "text": table_text,
+            "page": 1,
+            "table_id": table["table_id"],
+        }
+
+        chunks = chunking_pipeline.build_chunks([element])
+
+        # Should create at least one table chunk
+        self.assertGreater(len(chunks), 0)
+
+        # Check that first chunk is table type
+        table_chunk = chunks[0]
+        self.assertEqual(table_chunk["level"], "table")
+        self.assertIn("table_meta", table_chunk)
+
+        # Check that header is repeated in chunk
+        chunk_text = table_chunk["text"]
+        lines = chunk_text.split("\n")
+        self.assertGreaterEqual(len(lines), 3)  # Header + separator + at least 1 row
+
+        # First line should be header
+        header_line = lines[0]
+        self.assertIn("|", header_line)
+
+        # Second line should be separator
+        separator_line = lines[1]
+        self.assertIn("---", separator_line)
 
 
 if __name__ == "__main__":

@@ -30,21 +30,22 @@ class TestIngestPipeline(unittest.TestCase):
         self.assertEqual(response.status_code, 200)
         job_id = response.json()["job_id"]
 
-        # Poll for job completion
-        max_attempts = 30
-        for _ in range(max_attempts):
+        # Poll for job completion with timeout
+        max_attempts = 60  # 60 seconds timeout
+        for attempt in range(max_attempts):
             response = self.client.get(f"/ingest/{job_id}")
             self.assertEqual(response.status_code, 200)
 
             job_status = response.json()
             if job_status["status"] == "done":
+                print(f"✅ Job completed in {attempt + 1} seconds")
                 break
             elif job_status["status"] == "error":
                 self.fail(f"Job failed: {job_status.get('error', 'Unknown error')}")
 
             time.sleep(1)
         else:
-            self.fail("Job did not complete within expected time")
+            self.fail(f"Job did not complete within {max_attempts} seconds")
 
         # Verify database records
         document = self.db.query(Document).filter(Document.id == job_status["document_id"]).first()

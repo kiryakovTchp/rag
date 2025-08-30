@@ -1,0 +1,14 @@
+Employee Database
+
+ID | Name | Department | Salary | Experience | Location | Skills | Rating
+---|------|------------|--------|------------|----------|--------|-------
+1 | John Smith | Engineering | $85,000 | 5 years | New York | Python, JavaScript, SQL | 4.5
+2 | Sarah Johnson | Sales | $75,000 | 3 years | San Francisco | CRM, Negotiation | 4.2
+3 | Mike Davis | Marketing | $70,000 | 4 years | London | SEO, Analytics | 4.0
+4 | Lisa Wilson | HR | $65,000 | 6 years | Berlin | Recruitment, HRIS | 4.3
+5 | David Brown | Finance | $90,000 | 8 years | Tokyo | Excel, SAP | 4.7
+6 | Emma Taylor | Operations | $80,000 | 7 years | Sydney | Project Management | 4.4
+7 | James Anderson | Engineering | $95,000 | 9 years | New York | Java, Spring, AWS | 4.8
+8 | Maria Garcia | Sales | $78,000 | 4 years | San Francisco | B2B Sales, CRM | 4.1
+9 | Robert Martinez | Marketing | $72,000 | 5 years | London | Social Media, PPC | 4.2
+10 | Jennifer Lee | HR | $68,000 | 5 years | Berlin | Benefits, Compliance | 4.5

@@ -26,6 +26,9 @@ class TableParser:
             ]:
                 # For Excel/CSV files, extract tables
                 tables.extend(self._extract_office_tables(file_path, mime_type))
+            elif mime_type == "text/plain":
+                # For plain text files, try to extract markdown tables
+                tables.extend(self._extract_text_tables(file_path))
 
             return tables
 
@@ -168,6 +171,81 @@ class TableParser:
             markdown_lines.append("|" + "|".join(line.split(",")) + "|")
 
         return "\n".join(markdown_lines)
+
+    def _extract_text_tables(self, file_path: str) -> list[dict]:
+        """Extract tables from plain text files (markdown format)."""
+        tables = []
+
+        try:
+            with open(file_path, "r", encoding="utf-8") as f:
+                content = f.read()
+
+            # Look for markdown table patterns
+            lines = content.split("\n")
+            table_start = None
+            table_lines = []
+
+            for i, line in enumerate(lines):
+                line = line.strip()
+
+                # Check if line looks like table header (contains |)
+                if "|" in line and not line.startswith("|"):
+                    # Check if next line contains separator (---)
+                    if i + 1 < len(lines) and "---" in lines[i + 1]:
+                        table_start = i
+                        table_lines = [line]
+                        continue
+
+                # If we're in a table, collect lines
+                if table_start is not None:
+                    if "|" in line:
+                        table_lines.append(line)
+                    else:
+                        # End of table
+                        if len(table_lines) >= 3:  # Header + separator + at least 1 row
+                            table_id = f"text_table_{table_start}"
+                            table_text = "\n".join(table_lines)
+
+                            # Save table artifact to S3
+                            artifact_key = f"artifacts/tables/{table_id}.md"
+                            self._save_table_artifact(table_text, artifact_key)
+
+                            tables.append(
+                                {
+                                    "type": "table",
+                                    "text": table_text,
+                                    "page": 1,
+                                    "bbox": None,
+                                    "table_id": table_id,
+                                }
+                            )
+
+                        table_start = None
+                        table_lines = []
+
+            # Handle table at end of file
+            if table_start is not None and len(table_lines) >= 3:
+                table_id = f"text_table_{table_start}"
+                table_text = "\n".join(table_lines)
+
+                # Save table artifact to S3
+                artifact_key = f"artifacts/tables/{table_id}.md"
+                self._save_table_artifact(table_text, artifact_key)
+
+                tables.append(
+                    {
+                        "type": "table",
+                        "text": table_text,
+                        "page": 1,
+                        "bbox": None,
+                        "table_id": table_id,
+                    }
+                )
+
+        except Exception as e:
+            print(f"Failed to extract text tables: {e}")
+
+        return tables
 
     def _save_table_artifact(self, table_text: str, artifact_key: str) -> None:
         """Save table artifact to S3."""

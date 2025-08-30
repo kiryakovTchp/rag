@@ -89,4 +89,35 @@ except Exception as e:
     exit(1)
 "
 
+# Check TableParser and dependencies
+echo "  Checking TableParser..."
+python3 -c "
+try:
+    from services.parsing.tables import TableParser
+    print('    ✅ TableParser: OK')
+except Exception as e:
+    print(f'    ❌ TableParser: {e}')
+    exit(1)
+"
+
+echo "  Checking pdfplumber..."
+python3 -c "
+try:
+    import pdfplumber
+    print('    ✅ pdfplumber: OK')
+except Exception as e:
+    print(f'    ❌ pdfplumber: {e}')
+    exit(1)
+"
+
+echo "  Checking ChunkingPipeline..."
+python3 -c "
+try:
+    from services.chunking.pipeline import ChunkingPipeline
+    print('    ✅ ChunkingPipeline: OK')
+except Exception as e:
+    print(f'    ❌ ChunkingPipeline: {e}')
+    exit(1)
+"
+
 echo "✅ All services and components are ready!"
