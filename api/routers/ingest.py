@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from api.deps import get_db
-from api.schemas.ingest import IngestResponse, JobStatusResponse
+from api.schemas.ingest import IngestResponse, JobStatusResponse, DocumentStatusResponse
 from services.ingest.service import IngestService
 
 router = APIRouter()
@@ -64,3 +64,15 @@ async def get_job_status(job_id: int, db: Session = _GET_DB) -> JobStatusRespons
         created_at=job.created_at.isoformat() if job.created_at else "",
         updated_at=job.updated_at.isoformat() if job.updated_at else "",
     )
+
+
+@router.get("/ingest/document/{document_id}", response_model=DocumentStatusResponse)
+async def get_document_status(document_id: int, db: Session = _GET_DB) -> DocumentStatusResponse:
+    """Get document status with all jobs."""
+    service = IngestService(db)
+    document_status = service.get_document_status(document_id)
+
+    if not document_status:
+        raise HTTPException(status_code=404, detail="Document not found")
+
+    return document_status

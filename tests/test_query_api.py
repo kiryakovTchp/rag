@@ -70,14 +70,13 @@ class TestQueryAPI(unittest.TestCase):
         chunks = self.db.query(Chunk).filter(Chunk.document_id == document.id).all()
         self.assertGreater(len(chunks), 0)
         
-        # Wait for embed job to complete
-        embed_jobs = [j for j in job_status.get("jobs", []) if j.get("type") == "embed"]
-        if embed_jobs:
-            embed_job_id = embed_jobs[0]["id"]
+        # Wait for embed job to complete using document status
+        document_id = job_status.get("document_id")
+        if document_id:
             for attempt in range(60):
-                response = self.client.get(f"/ingest/{job_id}")
-                job_status = response.json()
-                embed_jobs = [j for j in job_status.get("jobs", []) if j.get("type") == "embed"]
+                response = self.client.get(f"/ingest/document/{document_id}")
+                document_status = response.json()
+                embed_jobs = [j for j in document_status.get("jobs", []) if j.get("type") == "embed"]
                 if embed_jobs and embed_jobs[0]["status"] == "done":
                     break
                 elif embed_jobs and embed_jobs[0]["status"] == "error":

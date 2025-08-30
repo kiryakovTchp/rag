@@ -29,3 +29,24 @@ class JobStatusResponse(BaseModel):
     document_id: int
     created_at: str
     updated_at: str
+
+
+class JobInfo(BaseModel):
+    """Job information model."""
+
+    id: int
+    type: str
+    status: str
+    progress: int
+    error: Optional[str] = None
+    document_id: int
+    created_at: str
+    updated_at: str
+
+
+class DocumentStatusResponse(BaseModel):
+    """Response model for document status with all jobs."""
+
+    document_id: int
+    status: str
+    jobs: list[JobInfo]

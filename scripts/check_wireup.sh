@@ -145,23 +145,69 @@ except Exception as e:
     exit(1)
 "
 
-# 10) Check WorkersAIEmbedder (should fail without token)
-echo "10. Checking WorkersAIEmbedder..."
-python3 -c "
-try:
-    from services.embed.workers_ai import WorkersAIEmbedder
-    embedder = WorkersAIEmbedder()
-    print('❌ WorkersAIEmbedder should fail without token')
-    exit(1)
-except ValueError as e:
-    if 'WORKERS_AI_TOKEN' in str(e):
-        print('✅ WorkersAIEmbedder: properly configured (requires token)')
-    else:
+    # 10) Check WorkersAIEmbedder (should fail without token)
+    echo "10. Checking WorkersAIEmbedder..."
+    python3 -c "
+    try:
+        from services.embed.workers_ai import WorkersAIEmbedder
+        embedder = WorkersAIEmbedder()
+        print('❌ WorkersAIEmbedder should fail without token')
+        exit(1)
+    except ValueError as e:
+        if 'WORKERS_AI_TOKEN' in str(e):
+            print('✅ WorkersAIEmbedder: properly configured (requires token)')
+        else:
+            print(f'❌ WorkersAIEmbedder: {e}')
+            exit(1)
+    except Exception as e:
         print(f'❌ WorkersAIEmbedder: {e}')
         exit(1)
-except Exception as e:
-    print(f'❌ WorkersAIEmbedder: {e}')
-    exit(1)
-"
+    "
+
+    # 11) Check embed_document is registered as Celery task
+    echo "11. Checking embed_document Celery task registration..."
+    python3 -c "
+    try:
+        from workers.app import celery_app
+        from workers.tasks.embed import embed_document
+        
+        # Check if task is registered
+        task_name = embed_document.name
+        if task_name in celery_app.tasks:
+            print(f'✅ embed_document task registered: {task_name}')
+        else:
+            print(f'❌ embed_document task not registered: {task_name}')
+            exit(1)
+    except Exception as e:
+        print(f'❌ embed_document task check failed: {e}')
+        exit(1)
+    "
+
+    # 12) Check PGVectorIndex doesn't create private engine
+    echo "12. Checking PGVectorIndex doesn't create private engine..."
+    python3 -c "
+    import ast
+    
+    try:
+        with open('services/index/pgvector.py', 'r') as f:
+            content = f.read()
+        
+        tree = ast.parse(content)
+        
+        # Check for create_engine calls
+        for node in ast.walk(tree):
+            if isinstance(node, ast.Call):
+                if hasattr(node.func, 'id') and node.func.id == 'create_engine':
+                    print('❌ PGVectorIndex contains create_engine call')
+                    exit(1)
+                elif hasattr(node.func, 'attr') and node.func.attr == 'create_engine':
+                    print('❌ PGVectorIndex contains create_engine call')
+                    exit(1)
+        
+        print('✅ PGVectorIndex doesn\'t create private engine')
+    except Exception as e:
+        print(f'❌ PGVectorIndex engine check failed: {e}')
+        exit(1)
+    "
 
 echo "✅ Sprint-2 wireup check passed!"

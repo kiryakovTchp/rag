@@ -75,21 +75,26 @@ def index_document_embeddings(self, document_id: int) -> dict:
             batch_texts = chunk_texts[i:i + batch_size]
             batch_embeddings = embedder.embed_texts(batch_texts)
             all_embeddings.extend(batch_embeddings)
-            
-            # Update progress
-            progress = min(100, int((i + len(batch_texts)) / len(chunk_texts) * 100))
-            current_task.update_state(
-                state="RUNNING",
-                meta={
-                    "status": "processing",
-                    "document_id": document_id,
-                    "progress": progress
-                }
-            )
+        
+        # Convert to numpy array
+        import numpy as np
+        all_embeddings = np.array(all_embeddings, dtype=np.float32)
+        
+        # Update progress
+        progress = min(100, int((len(chunk_texts)) / len(chunk_texts) * 100))
+        current_task.update_state(
+            state="RUNNING",
+            meta={
+                "status": "processing",
+                "document_id": document_id,
+                "progress": progress
+            }
+        )
         
         # Upsert embeddings
         provider = embedder.get_provider()
-        index.upsert_embeddings(chunks, all_embeddings, provider)
+        chunk_ids = [chunk.id for chunk in chunks]
+        index.upsert_embeddings(chunk_ids, all_embeddings, provider)
         
         time_taken = time.time() - start_time
         
