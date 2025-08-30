@@ -1,0 +1,36 @@
+# Test Document
+
+This is a test document for the PromoAI RAG system.
+
+## Introduction
+
+This document contains multiple sections to test the parsing and chunking pipeline.
+
+## Section 1: Basic Information
+
+This section contains basic information about the test.
+
+### Subsection 1.1: Details
+
+Here are some details about the test:
+- Item 1: First test item
+- Item 2: Second test item
+- Item 3: Third test item
+
+## Section 2: Advanced Features
+
+This section tests more advanced features.
+
+### Subsection 2.1: Tables
+
+Here is a sample table:
+
+| Name | Age | City |
+|------|-----|------|
+| John | 25  | New York |
+| Jane | 30  | Los Angeles |
+| Bob  | 35  | Chicago |
+
+## Conclusion
+
+This concludes our test document. The system should be able to parse this document and create appropriate chunks with metadata.

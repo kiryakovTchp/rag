@@ -36,7 +36,7 @@ class PDFParser:
                             elements.append(
                                 {
                                     "type": current_type,
-                                    "text": current_text.strip(),
+                                    "text": self._normalize_text(current_text.strip()),
                                     "page": page_num,
                                     "bbox": None,
                                 }
@@ -54,7 +54,7 @@ class PDFParser:
                                 elements.append(
                                     {
                                         "type": current_type,
-                                        "text": current_text.strip(),
+                                        "text": self._normalize_text(current_text.strip()),
                                         "page": page_num,
                                         "bbox": None,
                                     }
@@ -73,7 +73,7 @@ class PDFParser:
                     elements.append(
                         {
                             "type": current_type,
-                            "text": current_text.strip(),
+                            "text": self._normalize_text(current_text.strip()),
                             "page": page_num,
                             "bbox": None,
                         }

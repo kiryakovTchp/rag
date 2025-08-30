@@ -91,6 +91,10 @@ storage/               # S3/MinIO клиент
 Скопируйте `env.example` в `.env` и настройте переменные:
 
 ```bash
+# Скопировать пример конфигурации
+cp env.example .env
+
+# Настроить переменные в .env:
 # База данных
 DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/postgres
 

@@ -29,7 +29,7 @@ class ChunkingPipeline:
                 # Split by tokens
                 text_chunks = self.token_splitter.split_text(section_text)
 
-                # Create chunks
+                # Create chunks with metadata
                 for _i, chunk_text in enumerate(text_chunks):
                     chunk = {
                         "level": "section",
@@ -40,6 +40,13 @@ class ChunkingPipeline:
                         "element_id": (
                             section["elements"][0].get("id") if section["elements"] else None
                         ),
+                        "source_span": {
+                            "start": 0,
+                            "end": len(chunk_text),
+                            "section": (
+                                section["header_path"][-1] if section["header_path"] else "root"
+                            ),
+                        },
                     }
                     chunks.append(chunk)
 
@@ -51,7 +58,7 @@ class ChunkingPipeline:
         return chunks
 
     def _process_table(self, table: dict) -> list[dict]:
-        """Process table into chunks."""
+        """Process table into chunks with header repetition."""
         table_text = table["text"]
         lines = table_text.split("\n")
 
@@ -67,11 +74,18 @@ class ChunkingPipeline:
                     "table_meta": {
                         "table_id": table.get("table_id"),
                         "rows": len(lines) - 2,  # Exclude header and separator
+                        "headers": self._extract_table_headers(lines),
+                        "total_rows": len(lines) - 2,
+                    },
+                    "source_span": {
+                        "start": 0,
+                        "end": len(table_text),
+                        "table_id": table.get("table_id"),
                     },
                 }
             ]
 
-        # Large table, split into groups of 20-60 rows
+        # Large table, split into groups of 20-60 rows with header repetition
         chunks: list[dict] = []
         header = lines[0]
         separator = lines[1]
@@ -95,8 +109,30 @@ class ChunkingPipeline:
                         "rows": len(chunk_lines),
                         "start_row": i + 1,
                         "end_row": i + len(chunk_lines),
+                        "headers": self._extract_table_headers([header, separator] + chunk_lines),
+                        "has_header_repeat": True,
+                    },
+                    "source_span": {
+                        "start": i,
+                        "end": i + len(chunk_lines),
+                        "table_id": table.get("table_id"),
+                        "row_range": f"{i + 1}-{i + len(chunk_lines)}",
                     },
                 }
             )
 
         return chunks
+
+    def _extract_table_headers(self, lines: list[str]) -> list[str]:
+        """Extract table headers from markdown table lines."""
+        if len(lines) < 1:
+            return []
+
+        # First line contains headers
+        header_line = lines[0]
+        if header_line.startswith("|") and header_line.endswith("|"):
+            # Remove leading/trailing pipes and split
+            headers = header_line[1:-1].split("|")
+            return [h.strip() for h in headers]
+
+        return []

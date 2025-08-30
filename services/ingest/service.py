@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from db.models import Document, Job
 from storage.r2 import ObjectStore
+from workers.tasks.parse import parse_document
 
 
 class IngestService:
@@ -53,11 +54,10 @@ class IngestService:
             self.db.add(job)
             self.db.commit()
 
-            # TODO: Trigger parse task
-            # from workers.tasks.parse import parse_document
-            # parse_document.delay(document.id)
+            # Trigger parse task
+            parse_document.delay(document.id)
 
-            return int(job.id)
+            return job.id
 
         finally:
             # Clean up temporary file
