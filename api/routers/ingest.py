@@ -27,6 +27,7 @@ async def ingest_document(
         "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
         "text/markdown",
         "text/html",
+        "text/plain",
         "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
         "text/csv",
     ]

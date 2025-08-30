@@ -9,4 +9,4 @@ lint:
 	pre-commit run -a
 
 test:
-	pytest || true
+	pytest

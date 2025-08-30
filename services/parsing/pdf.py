@@ -1,17 +1,17 @@
 import re
 
-from pymupdf4llm import PyMuPDF4LLM
+import pymupdf4llm
 
 
 class PDFParser:
     def __init__(self) -> None:
-        self.parser = PyMuPDF4LLM()
+        pass
 
     def parse_to_elements(self, file_path: str) -> list[dict]:
         """Parse PDF file into elements."""
         try:
             # Parse PDF to markdown
-            markdown_content = self.parser.to_markdown(
+            markdown_content = pymupdf4llm.to_markdown(
                 file_path, page_chunks=True, include_images=False
             )
 

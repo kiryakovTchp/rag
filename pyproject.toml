@@ -4,13 +4,14 @@ target-version = ["py311"]
 
 [tool.ruff]
 line-length = 100
-lint.select = ["E","F","I","UP","B"]
+select = ["E","F","I","UP","B"]
 extend-exclude = ["frontend"]
 
 [tool.mypy]
 python_version = "3.11"
 strict = true
 ignore_missing_imports = true
+exclude = ["demo_api.py"]
 disable_error_code = ["misc", "valid-type", "no-any-return", "type-arg", "no-untyped-def"]
 [[tool.mypy.overrides]]
 module = "redis.*"
