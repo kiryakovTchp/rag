@@ -47,4 +47,46 @@ except Exception as e:
     exit(1)
 "
 
-echo "✅ All services are ready!"
+# Check Celery tasks
+echo "  Checking Celery tasks..."
+python3 -c "
+from workers.app import celery_app
+from workers.tasks.parse import parse_document
+from workers.tasks.chunk import chunk_document
+
+# Check if tasks are registered
+if 'workers.tasks.parse.parse_document' not in celery_app.tasks:
+    print('    ❌ parse_document task not registered')
+    exit(1)
+if 'workers.tasks.chunk.chunk_document' not in celery_app.tasks:
+    print('    ❌ chunk_document task not registered')
+    exit(1)
+
+print('    ✅ Celery tasks: OK')
+"
+
+# Check S3 client methods
+echo "  Checking S3 client methods..."
+python3 -c "
+from storage.r2 import ObjectStore
+import os
+
+os.environ['S3_ENDPOINT'] = 'http://localhost:9000'
+os.environ['S3_ACCESS_KEY_ID'] = 'minio'
+os.environ['S3_SECRET_ACCESS_KEY'] = 'minio123'
+
+try:
+    store = ObjectStore()
+    # Test basic methods exist
+    methods = ['put_file', 'get_file', 'delete', 'exists']
+    for method in methods:
+        if not hasattr(store, method):
+            print(f'    ❌ S3 client missing method: {method}')
+            exit(1)
+    print('    ✅ S3 client methods: OK')
+except Exception as e:
+    print(f'    ❌ S3 client: {e}')
+    exit(1)
+"
+
+echo "✅ All services and components are ready!"
