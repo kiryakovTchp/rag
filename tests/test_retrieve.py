@@ -10,7 +10,7 @@ from fastapi.testclient import TestClient
 from api.main import app
 from db.models import Document, Chunk
 from db.session import SessionLocal
-from services.retrieve.dense import DenseRetriever
+from services.retrieve.hybrid import HybridRetriever
 from workers.tasks.index import index_document_embeddings
 
 
@@ -74,11 +74,11 @@ class TestRetrieve(unittest.TestCase):
         index_document_embeddings(document.id)
         
         # Test retrieve
-        retriever = DenseRetriever()
+        retriever = HybridRetriever()
         
         # Search for text that should be in the document
         query = "test document"
-        results = retriever.search(query, top_k=3)
+        results = retriever.retrieve(query, top_k=3)
         
         # Should find at least one result
         self.assertGreater(len(results), 0)

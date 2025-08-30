@@ -8,8 +8,7 @@ from fastapi.responses import JSONResponse
 
 from api.schemas.query import QueryRequest, QueryResponse, QueryMatch, QueryUsage
 from services.chunking.token import TokenTextSplitter
-from services.retrieve.dense import DenseRetriever
-from services.retrieve.rerank import WorkersAIReranker
+from services.retrieve.hybrid import HybridRetriever
 from services.retrieve.context_builder import ContextBuilder
 from services.retrieve.types import ChunkWithScore
 
@@ -27,25 +26,26 @@ async def query(request: QueryRequest) -> QueryResponse:
         )
     
     # Initialize services
-    retriever = DenseRetriever()
+    retriever = HybridRetriever()
     context_builder = ContextBuilder()
     token_splitter = TokenTextSplitter()
     
     # Count input tokens
     in_tokens = token_splitter.count_tokens(request.query)
     
-    # Search for relevant chunks
-    matches = retriever.search(request.query, request.top_k)
+    # Retrieve relevant chunks
+    matches = retriever.retrieve(
+        query=request.query,
+        top_k=request.top_k,
+        rerank_k=min(20, request.top_k),
+        use_rerank=request.rerank
+    )
     
     if not matches:
         return QueryResponse(
             matches=[],
             usage=QueryUsage(in_tokens=in_tokens, out_tokens=0)
         )
-    
-    # Apply reranking if enabled
-    if request.rerank:
-        matches = await _apply_reranking(request.query, matches, request.top_k)
     
     # Build context
     context_matches = context_builder.build(matches, request.max_ctx)
@@ -62,20 +62,7 @@ async def query(request: QueryRequest) -> QueryResponse:
     )
 
 
-async def _apply_reranking(query: str, matches: List[ChunkWithScore], top_k: int) -> List[ChunkWithScore]:
-    """Apply reranking to matches."""
-    reranker = WorkersAIReranker()
-    
-    # Prepare pairs for reranking
-    pairs = [(query, match["snippet"]) for match in matches]
-    
-    # Get reranked indices
-    indices = reranker.rerank(pairs, top_k)
-    
-    # Reorder matches based on reranked indices
-    reranked_matches = [matches[i] for i in indices if i < len(matches)]
-    
-    return reranked_matches
+
 
 
 def _chunk_to_match(chunk: ChunkWithScore) -> QueryMatch:

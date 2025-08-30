@@ -3,6 +3,8 @@
 import os
 from typing import List
 
+import numpy as np
+
 from services.embed.bge_m3 import BGEM3Embedder
 from services.embed.workers_ai import WorkersAIEmbedder
 
@@ -22,25 +24,25 @@ class EmbeddingProvider:
         else:
             raise ValueError(f"Unknown embedding provider: {self.provider}")
 
-    def embed_texts(self, texts: List[str]) -> List[List[float]]:
+    def embed_texts(self, texts: List[str]) -> np.ndarray:
         """Embed a list of texts.
 
         Args:
             texts: List of text strings to embed
 
         Returns:
-            List of embedding vectors
+            Numpy array of embeddings (n_texts, 1024)
         """
         return self.embedder.embed_texts(texts)
 
-    def embed_single(self, text: str) -> List[float]:
+    def embed_single(self, text: str) -> np.ndarray:
         """Embed a single text.
 
         Args:
             text: Text string to embed
 
         Returns:
-            Embedding vector
+            Embedding vector (1024,)
         """
         return self.embedder.embed_single(text)
 

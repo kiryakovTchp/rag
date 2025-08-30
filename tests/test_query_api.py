@@ -93,6 +93,12 @@ class TestQueryAPI(unittest.TestCase):
         # Should have at least 3 matches
         self.assertGreaterEqual(len(result["matches"]), 3)
         
+        # Check usage
+        usage = result["usage"]
+        self.assertIn("in_tokens", usage)
+        self.assertIn("out_tokens", usage)
+        self.assertGreater(usage["in_tokens"], 0)
+        
         # Check match structure
         match = result["matches"][0]
         self.assertIn("doc_id", match)

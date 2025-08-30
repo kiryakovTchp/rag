@@ -1,0 +1,52 @@
+"""add embeddings table for pgvector
+
+Revision ID: 33699f75c48d
+Revises: 6a53d52332f7
+Create Date: 2025-08-31 01:24:48.801160
+
+"""
+from typing import Sequence, Union
+
+from alembic import op
+import sqlalchemy as sa
+
+
+# revision identifiers, used by Alembic.
+revision: str = '33699f75c48d'
+down_revision: Union[str, Sequence[str], None] = '6a53d52332f7'
+branch_labels: Union[str, Sequence[str], None] = None
+depends_on: Union[str, Sequence[str], None] = None
+
+
+def upgrade() -> None:
+    """Upgrade schema."""
+    # Create embeddings table
+    op.create_table('embeddings',
+        sa.Column('chunk_id', sa.Integer(), nullable=False),
+        sa.Column('vector', sa.Text(), nullable=False),  # JSON array of floats
+        sa.Column('provider', sa.String(length=50), nullable=False),
+        sa.Column('created_at', sa.DateTime(), nullable=True),
+        sa.ForeignKeyConstraint(['chunk_id'], ['chunks.id'], ondelete='CASCADE'),
+        sa.PrimaryKeyConstraint('chunk_id')
+    )
+
+    # Create index on provider for faster lookups
+    op.create_index(op.f('ix_embeddings_provider'), 'embeddings', ['provider'], unique=False)
+
+    # Create vector index for similarity search
+    op.execute("""
+        CREATE INDEX IF NOT EXISTS idx_embeddings_vector 
+        ON embeddings USING ivfflat (vector vector_cosine_ops)
+    """)
+
+
+def downgrade() -> None:
+    """Downgrade schema."""
+    # Drop vector index
+    op.execute("DROP INDEX IF EXISTS idx_embeddings_vector")
+    
+    # Drop provider index
+    op.drop_index(op.f('ix_embeddings_provider'), table_name='embeddings')
+    
+    # Drop table
+    op.drop_table('embeddings')

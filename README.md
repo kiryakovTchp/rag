@@ -42,6 +42,16 @@ curl -F file=@tests/fixtures/simple.pdf http://localhost:8000/ingest
 
 # Проверка статуса job (замените {job_id} на полученный ID)
 curl http://localhost:8000/ingest/{job_id}
+
+# Поиск по документам
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "ваш поисковый запрос",
+    "top_k": 10,
+    "rerank": false,
+    "max_ctx": 1800
+  }'
 ```
 
 ### 5. Остановка сервисов
@@ -67,6 +77,14 @@ make dev-down
 2. **Parse**: Документ разбивается на элементы (текст, заголовки, таблицы)
 3. **Chunk**: Элементы разбиваются на чанки с метаданными
 4. **Index**: Чанки индексируются для поиска
+5. **Query**: Векторный поиск с опциональным reranking
+
+### Query API
+
+- **POST `/query`**: Поиск по документам
+- **Embeddings**: BGE-M3 (1024-dimensional)
+- **Index**: PostgreSQL + pgvector
+- **Reranking**: Опционально через Workers AI
 
 ## Разработка
 

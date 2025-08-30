@@ -4,6 +4,7 @@ import json
 import os
 from typing import List, Tuple
 
+import numpy as np
 from sqlalchemy import create_engine, text
 
 from db.models import Chunk, Embedding
@@ -24,12 +25,12 @@ class PGVectorIndex:
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
             conn.commit()
 
-    def upsert_embeddings(self, chunks: List[Chunk], vectors: List[List[float]], provider: str):
+    def upsert_embeddings(self, chunks: List[Chunk], vectors: np.ndarray, provider: str):
         """Upsert embeddings for chunks.
 
         Args:
             chunks: List of chunks
-            vectors: List of embedding vectors
+            vectors: Numpy array of embeddings (n_chunks, 1024)
             provider: Embedding provider name
         """
         if len(chunks) != len(vectors):
@@ -39,7 +40,7 @@ class PGVectorIndex:
         try:
             for chunk, vector in zip(chunks, vectors):
                 # Convert vector to JSON string
-                vector_json = json.dumps(vector)
+                vector_json = json.dumps(vector.tolist())
 
                 # Upsert embedding
                 embedding = db.query(Embedding).filter(Embedding.chunk_id == chunk.id).first()
@@ -57,18 +58,18 @@ class PGVectorIndex:
         finally:
             db.close()
 
-    def search(self, query_vector: List[float], top_k: int = 100) -> List[Tuple[int, float]]:
+    def search(self, query_vector: np.ndarray, top_k: int = 100) -> List[Tuple[int, float]]:
         """Search for similar chunks.
 
         Args:
-            query_vector: Query embedding vector
+            query_vector: Query embedding vector (1024,)
             top_k: Number of results to return
 
         Returns:
             List of (chunk_id, score) tuples sorted by score DESC
         """
         # Convert query vector to JSON
-        query_json = json.dumps(query_vector)
+        query_json = json.dumps(query_vector.tolist())
 
         # SQL query using cosine similarity
         sql = """
