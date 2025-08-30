@@ -14,6 +14,8 @@
 - **Parsing**: PyMuPDF4LLM для PDF, unstructured для Office документов
 - **Chunking**: header-aware → token-aware (350-700 токенов, 15% overlap) → semantic
 - **Tables**: pdfplumber/camelot для извлечения таблиц, группы 20-60 строк с повтором заголовков
+- **Job Tracking**: Асинхронная обработка с прогрессом и статусами
+- **Error Handling**: Graceful degradation при ошибках парсинга
 
 ### Планируемая архитектура (Sprint 2+)
 - **Edge**: Cloudflare Pages + Workers (гейт/аутентификация/лимиты)
