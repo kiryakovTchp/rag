@@ -15,7 +15,7 @@ lint:
 	pre-commit run -a
 
 test:
-	pytest
+	python3 -m pytest
 
 test-e2e:
-	pytest tests/test_ingest_pipeline.py tests/test_tables_pdf.py -v
+	python3 -m pytest tests/test_ingest_pipeline.py tests/test_tables_pdf.py -v
