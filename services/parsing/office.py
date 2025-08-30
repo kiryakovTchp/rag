@@ -10,8 +10,16 @@ class OfficeParser:
     def parse_to_elements(self, file_path: str) -> list[dict]:
         """Parse office documents into elements."""
         try:
-            # Use unstructured's auto partition
-            elements_raw = partition(filename=file_path)
+            # Check if it's a plain text file
+            if file_path.endswith(".txt"):
+                return self._parse_plain_text(file_path)
+
+            # Use unstructured's auto partition for other file types
+            try:
+                elements_raw = partition(filename=file_path)
+            except Exception:
+                # If unstructured fails, try plain text parsing
+                return self._parse_plain_text(file_path)
 
             elements = []
             for element in elements_raw:
@@ -32,6 +40,31 @@ class OfficeParser:
 
         except Exception as e:
             raise Exception(f"Failed to parse office document: {e}") from e
+
+    def _parse_plain_text(self, file_path: str) -> list[dict]:
+        """Parse plain text files into elements."""
+        with open(file_path, encoding="utf-8") as f:
+            content = f.read()
+
+        # Split by paragraphs (double newlines)
+        paragraphs = [p.strip() for p in content.split("\n\n") if p.strip()]
+
+        elements = []
+        for _i, paragraph in enumerate(paragraphs):
+            element_type = self._determine_element_type(paragraph)
+            text = self._normalize_text(paragraph)
+
+            if text.strip():
+                elements.append(
+                    {
+                        "type": element_type,
+                        "text": text,
+                        "page": 1,  # Plain text is single page
+                        "bbox": None,
+                    }
+                )
+
+        return elements
 
     def _determine_element_type(self, element) -> str:
         """Determine element type based on unstructured element."""

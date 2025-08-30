@@ -11,16 +11,26 @@ class PDFParser:
         """Parse PDF file into elements."""
         try:
             # Parse PDF to markdown
-            markdown_content = pymupdf4llm.to_markdown(
-                file_path, page_chunks=True, include_images=False
-            )
+            markdown_content = pymupdf4llm.to_markdown(file_path, page_chunks=True)
 
             elements = []
 
+            # pymupdf4llm returns a list of page dictionaries
+            pages = markdown_content if isinstance(markdown_content, list) else [markdown_content]
+
             # Process each page
-            for page_num, page_content in enumerate(markdown_content, 1):
+            for page_num, page_content in enumerate(pages, 1):
+                if not page_content:
+                    continue
+
+                # Extract text from page dictionary
+                if isinstance(page_content, dict):
+                    page_text = page_content.get("text", "")
+                else:
+                    page_text = str(page_content)
+
                 # Split content by headers and paragraphs
-                lines = page_content.split("\n")
+                lines = page_text.split("\n")
                 current_text = ""
                 current_type = "text"
 

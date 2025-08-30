@@ -1,7 +1,14 @@
+from pathlib import Path
+
+from dotenv import load_dotenv
 from fastapi import FastAPI
 
 from api.routers.health import router as health_router
 from api.routers.ingest import router as ingest_router
+
+# Load environment variables from .env file
+env_path = Path(__file__).parent.parent / ".env"
+load_dotenv(env_path)
 
 app = FastAPI(title="PromoAI RAG API")
 
