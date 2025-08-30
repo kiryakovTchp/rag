@@ -1,8 +1,10 @@
 """Embedding tasks for Celery."""
 
 import logging
+import os
 from typing import List
 
+import numpy as np
 from celery import current_task
 from sqlalchemy.orm import Session
 
@@ -10,11 +12,13 @@ from db.models import Document, Chunk, Job
 from db.session import SessionLocal
 from services.embed.provider import EmbeddingProvider
 from services.index.pgvector import PGVectorIndex
+from workers.app import celery_app
 
 logger = logging.getLogger(__name__)
 
 
-def embed_document(document_id: int) -> dict:
+@celery_app.task(bind=True, queue="embed")
+def embed_document(self, document_id: int) -> dict:
     """Embed document chunks.
     
     Args:
@@ -23,15 +27,18 @@ def embed_document(document_id: int) -> dict:
     Returns:
         Dict with status and metadata
     """
-    db = SessionLocal()
+    """
+    Считает эмбеддинги для всех чанков документа и апсерчит в embeddings.
+    Обновляет Job(type='embed') progress 0→100, status -> done|failed.
+    """
+    session = SessionLocal()
     try:
-        # Get document
-        document = db.query(Document).filter(Document.id == document_id).first()
+        # 1) найти/создать embed-job для документа
+        document = session.query(Document).filter(Document.id == document_id).first()
         if not document:
             raise ValueError(f"Document {document_id} not found")
         
-        # Get or create embed job
-        job = db.query(Job).filter(
+        job = session.query(Job).filter(
             Job.document_id == document_id,
             Job.type == "embed"
         ).first()
@@ -43,18 +50,18 @@ def embed_document(document_id: int) -> dict:
                 progress=0,
                 document_id=document_id
             )
-            db.add(job)
-            db.commit()
-            db.refresh(job)
+            session.add(job)
+            session.commit()
+            session.refresh(job)
         else:
             job.status = "running"
             job.progress = 0
-            db.commit()
+            session.commit()
         
         logger.info(f"Starting embed job {job.id} for document {document_id}")
         
-        # Get chunks without embeddings
-        chunks = db.query(Chunk).filter(
+        # 2) выбрать чанки без эмбеддингов или все (идемпотентно)
+        chunks = session.query(Chunk).filter(
             Chunk.document_id == document_id
         ).all()
         
@@ -62,14 +69,13 @@ def embed_document(document_id: int) -> dict:
             logger.warning(f"No chunks found for document {document_id}")
             job.status = "done"
             job.progress = 100
-            db.commit()
-            return {"status": "success", "message": "No chunks to embed"}
+            session.commit()
+            return {"document_id": document_id, "status": "done", "message": "No chunks to embed"}
         
-        # Initialize services
+        # 3) батчами по 64 получить вектора (float32, shape=(N,1024))
         embedder = EmbeddingProvider()
         index = PGVectorIndex()
         
-        # Process chunks in batches
         batch_size = 64
         total_chunks = len(chunks)
         processed = 0
@@ -77,16 +83,14 @@ def embed_document(document_id: int) -> dict:
         for i in range(0, total_chunks, batch_size):
             batch_chunks = chunks[i:i + batch_size]
             
-            # Update progress
+            # 5) обновлять progress по мере батчей
             progress = int((processed / total_chunks) * 100)
             job.progress = progress
-            db.commit()
+            session.commit()
             
-            # Get chunk texts and IDs
             chunk_texts = [chunk.text for chunk in batch_chunks]
             chunk_ids = [chunk.id for chunk in batch_chunks]
             
-            # Generate embeddings as numpy array
             logger.info(f"Generating embeddings for batch {i//batch_size + 1}")
             embeddings = embedder.embed_texts(chunk_texts)
             
@@ -97,36 +101,31 @@ def embed_document(document_id: int) -> dict:
             if embeddings.shape != (len(batch_chunks), 1024):
                 raise ValueError(f"Embedding shape mismatch: {embeddings.shape} != ({len(batch_chunks)}, 1024)")
             
-            # Upsert embeddings using chunk IDs only
+            # 4) PGVectorIndex().upsert_embeddings(chunk_ids, vectors, provider='bge-m3'|ENV)
             provider = embedder.get_provider()
             index.upsert_embeddings(chunk_ids, embeddings, provider)
             
             processed += len(batch_chunks)
             logger.info(f"Processed {processed}/{total_chunks} chunks")
         
-        # Update job as done
+        # 6) status='done'
         job.status = "done"
         job.progress = 100
-        db.commit()
+        session.commit()
         
         logger.info(f"Completed embed job {job.id} for document {document_id}")
         
-        return {
-            "status": "success",
-            "document_id": document_id,
-            "chunks_processed": total_chunks,
-            "provider": provider
-        }
+        return {"document_id": document_id, "status": "done", "chunks_processed": total_chunks, "provider": provider}
         
     except Exception as e:
         logger.error(f"Error in embed_document {document_id}: {str(e)}")
         
-        # Update job as failed
+        # status='failed', error=str(e)
         if 'job' in locals():
             job.status = "error"
             job.error = str(e)
-            db.commit()
+            session.commit()
         
         raise
     finally:
-        db.close()
+        session.close()

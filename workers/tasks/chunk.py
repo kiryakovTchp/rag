@@ -125,4 +125,3 @@ def chunk_document(self, document_id: int) -> dict:
         raise
     finally:
         db.close()
-        logger.info(f"Completed chunk task for document {document_id}")

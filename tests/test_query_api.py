@@ -80,7 +80,11 @@ class TestQueryAPI(unittest.TestCase):
                 embed_jobs = [j for j in job_status.get("jobs", []) if j.get("type") == "embed"]
                 if embed_jobs and embed_jobs[0]["status"] == "done":
                     break
+                elif embed_jobs and embed_jobs[0]["status"] == "error":
+                    self.fail(f"Embed job failed: {embed_jobs[0].get('error', 'Unknown error')}")
                 time.sleep(1)
+            else:
+                self.fail("Embed job did not complete within 60 seconds")
         
         # Test query API
         query_data = {

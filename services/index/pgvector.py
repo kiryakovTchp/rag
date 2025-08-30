@@ -5,10 +5,10 @@ import os
 from typing import List, Tuple
 
 import numpy as np
-from sqlalchemy import create_engine, text
+from sqlalchemy import text
 
 from db.models import Chunk, Embedding
-from db.session import SessionLocal
+from db.session import SessionLocal, engine
 
 
 class PGVectorIndex:
@@ -16,12 +16,11 @@ class PGVectorIndex:
 
     def __init__(self):
         """Initialize pgvector index."""
-        self.engine = create_engine(os.getenv("DATABASE_URL"))
         self._ensure_pgvector_extension()
 
     def _ensure_pgvector_extension(self):
         """Ensure pgvector extension is enabled."""
-        with self.engine.connect() as conn:
+        with engine.connect() as conn:
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
             conn.commit()
 
@@ -49,7 +48,7 @@ class PGVectorIndex:
             DO UPDATE SET 
                 vector = EXCLUDED.vector,
                 provider = EXCLUDED.provider,
-                created_at = NOW()
+                updated_at = NOW()
             """
             
             for chunk_id, vector in zip(chunk_ids, vectors):
@@ -86,7 +85,7 @@ class PGVectorIndex:
         LIMIT :top_k
         """
 
-        with self.engine.connect() as conn:
+        with engine.connect() as conn:
             result = conn.execute(text(sql), {"query_vector": query_vector, "top_k": top_k})
 
             results = []
