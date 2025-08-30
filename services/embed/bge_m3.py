@@ -26,10 +26,10 @@ class BGEM3Embedder:
             texts: List of text strings to embed
             
         Returns:
-            Numpy array of embeddings (n_texts, 1024)
+            Numpy array of embeddings (n_texts, 1024) float32
         """
         if not texts:
-            return np.array([])
+            return np.array([], dtype=np.float32)
         
         # Process in batches
         all_embeddings = []
@@ -40,11 +40,12 @@ class BGEM3Embedder:
             embeddings = self.model.encode(batch, normalize_embeddings=True)
             all_embeddings.append(embeddings)
         
-        # Concatenate all batches
+        # Concatenate all batches and ensure float32
         if all_embeddings:
-            return np.vstack(all_embeddings)
+            result = np.vstack(all_embeddings).astype(np.float32)
+            return result
         else:
-            return np.array([])
+            return np.array([], dtype=np.float32)
     
     def embed_single(self, text: str) -> np.ndarray:
         """Embed a single text.

@@ -5,6 +5,13 @@ from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
+# Import pgvector Vector type
+try:
+    from pgvector.sqlalchemy import Vector
+except ImportError:
+    # Fallback for development without pgvector
+    Vector = Text
+
 Base = declarative_base()
 
 
@@ -79,9 +86,9 @@ class Embedding(Base):
     __tablename__ = "embeddings"
 
     chunk_id = Column(Integer, ForeignKey("chunks.id", ondelete="CASCADE"), primary_key=True)
-    vector = Column(Text, nullable=False)  # JSON array of floats
+    vector = Column(Vector(1024), nullable=False)  # pgvector vector(1024)
     provider = Column(String(50), nullable=False)  # local, workers_ai
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
 
     # Relationships
     chunk = relationship("Chunk", backref="embedding")

@@ -9,7 +9,7 @@ celery_app = Celery(
     "promoai_rag",
     broker=REDIS_URL,
     backend=REDIS_URL,
-    include=["workers.tasks.parse", "workers.tasks.chunk"],
+    include=["workers.tasks.parse", "workers.tasks.chunk", "workers.tasks.embed"],
 )
 
 # Celery configuration

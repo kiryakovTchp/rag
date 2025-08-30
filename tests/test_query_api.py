@@ -103,9 +103,14 @@ class TestQueryAPI(unittest.TestCase):
         match = result["matches"][0]
         self.assertIn("doc_id", match)
         self.assertIn("chunk_id", match)
+        self.assertIn("page", match)
         self.assertIn("score", match)
         self.assertIn("snippet", match)
         self.assertIn("breadcrumbs", match)
+        
+        # Check score range
+        self.assertGreaterEqual(match["score"], 0.0)
+        self.assertLessEqual(match["score"], 1.0)
         
         # Check usage
         usage = result["usage"]

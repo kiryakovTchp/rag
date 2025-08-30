@@ -91,9 +91,10 @@ def chunk_document(self, document_id: int) -> dict:
             db.commit()
             logger.info(f"Updated job {job.id} status to done, progress: 100%")
 
-        # Trigger indexing task
-        logger.info(f"Triggering index task for document {document_id}")
-        index_document_embeddings.delay(document_id)
+                    # Trigger embedding task
+            logger.info(f"Triggering embed task for document {document_id}")
+            from workers.tasks.embed import embed_document
+            embed_document.delay(document_id)
 
         return {
             "status": "success",

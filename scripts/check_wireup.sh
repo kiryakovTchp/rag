@@ -141,4 +141,73 @@ except Exception as e:
     exit(1)
 "
 
+echo "  Checking pgvector setup..."
+python3 -c "
+try:
+    from db.models import Embedding
+    from sqlalchemy import inspect
+    
+    # Check if vector column is proper pgvector type
+    inspector = inspect(Embedding.__table__)
+    vector_col = inspector.get_columns()['vector']
+    
+    if 'Vector' in str(vector_col.type):
+        print('    ✅ Embedding.vector is Vector(1024): OK')
+    else:
+        print('    ❌ Embedding.vector is not Vector type')
+        exit(1)
+        
+    # Check migrations for pgvector extension
+    import os
+    migration_files = [f for f in os.listdir('db/migrations/versions') if f.endswith('.py')]
+    pgvector_migrations = []
+    
+    for f in migration_files:
+        with open(f'db/migrations/versions/{f}', 'r') as mf:
+            content = mf.read()
+            if 'CREATE EXTENSION' in content and 'vector' in content:
+                pgvector_migrations.append(f)
+    
+    if pgvector_migrations:
+        print(f'    ✅ Found pgvector migrations: {pgvector_migrations}')
+    else:
+        print('    ❌ No pgvector extension migration found')
+        exit(1)
+        
+except Exception as e:
+    print(f'    ❌ pgvector check failed: {e}')
+    exit(1)
+"
+
+echo "  Checking WorkersAIEmbedder..."
+python3 -c "
+try:
+    from services.embed.workers_ai import WorkersAIEmbedder
+    
+    # Check if it's not returning zeros
+    embedder = WorkersAIEmbedder()
+    test_text = 'test'
+    embedding = embedder.embed_single(test_text)
+    
+    if embedding is None or len(embedding) == 0:
+        print('    ❌ WorkersAIEmbedder returned empty embedding')
+        exit(1)
+    
+    # Check if it's not all zeros
+    if all(x == 0 for x in embedding):
+        print('    ❌ WorkersAIEmbedder returned all zeros')
+        exit(1)
+        
+    print('    ✅ WorkersAIEmbedder: OK')
+except ValueError as e:
+    if 'WORKERS_AI_TOKEN' in str(e):
+        print('    ✅ WorkersAIEmbedder: properly configured (requires token)')
+    else:
+        print(f'    ❌ WorkersAIEmbedder: {e}')
+        exit(1)
+except Exception as e:
+    print(f'    ❌ WorkersAIEmbedder: {e}')
+    exit(1)
+"
+
 echo "✅ All services and components are ready!"

@@ -25,34 +25,40 @@ class PGVectorIndex:
             conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
             conn.commit()
 
-    def upsert_embeddings(self, chunks: List[Chunk], vectors: np.ndarray, provider: str):
+    def upsert_embeddings(self, chunk_ids: List[int], vectors: np.ndarray, provider: str):
         """Upsert embeddings for chunks.
 
         Args:
-            chunks: List of chunks
-            vectors: Numpy array of embeddings (n_chunks, 1024)
+            chunk_ids: List of chunk IDs
+            vectors: Numpy array of embeddings (n_chunks, 1024) float32
             provider: Embedding provider name
         """
-        if len(chunks) != len(vectors):
-            raise ValueError("Number of chunks must match number of vectors")
+        if len(chunk_ids) != len(vectors):
+            raise ValueError("Number of chunk_ids must match number of vectors")
+
+        # Ensure vectors are float32
+        vectors = vectors.astype(np.float32)
 
         db = SessionLocal()
         try:
-            for chunk, vector in zip(chunks, vectors):
-                # Convert vector to JSON string
-                vector_json = json.dumps(vector.tolist())
-
-                # Upsert embedding
-                embedding = db.query(Embedding).filter(Embedding.chunk_id == chunk.id).first()
-
-                if embedding:
-                    # Update existing
-                    embedding.vector = vector_json
-                    embedding.provider = provider
-                else:
-                    # Create new
-                    embedding = Embedding(chunk_id=chunk.id, vector=vector_json, provider=provider)
-                    db.add(embedding)
+            # Use raw SQL for efficient upsert
+            sql = """
+            INSERT INTO embeddings (chunk_id, vector, provider, created_at)
+            VALUES (:chunk_id, :vector, :provider, NOW())
+            ON CONFLICT (chunk_id) 
+            DO UPDATE SET 
+                vector = EXCLUDED.vector,
+                provider = EXCLUDED.provider,
+                created_at = NOW()
+            """
+            
+            for chunk_id, vector in zip(chunk_ids, vectors):
+                # pgvector adapter will handle numpy array conversion
+                db.execute(text(sql), {
+                    "chunk_id": chunk_id,
+                    "vector": vector,
+                    "provider": provider
+                })
 
             db.commit()
         finally:
@@ -62,16 +68,16 @@ class PGVectorIndex:
         """Search for similar chunks.
 
         Args:
-            query_vector: Query embedding vector (1024,)
+            query_vector: Query embedding vector (1024,) float32
             top_k: Number of results to return
 
         Returns:
             List of (chunk_id, score) tuples sorted by score DESC
         """
-        # Convert query vector to JSON
-        query_json = json.dumps(query_vector.tolist())
+        # Ensure query vector is float32
+        query_vector = query_vector.astype(np.float32)
 
-        # SQL query using cosine similarity
+        # SQL query using cosine similarity with L2 normalization
         sql = """
         SELECT e.chunk_id, 
                1 - (e.vector <=> :query_vector) as score
@@ -81,7 +87,7 @@ class PGVectorIndex:
         """
 
         with self.engine.connect() as conn:
-            result = conn.execute(text(sql), {"query_vector": query_json, "top_k": top_k})
+            result = conn.execute(text(sql), {"query_vector": query_vector, "top_k": top_k})
 
             results = []
             for row in result:

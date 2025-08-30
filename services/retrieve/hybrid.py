@@ -44,7 +44,8 @@ class HybridRetriever:
             return []
         
         # Get chunks from database
-        chunks = self._get_chunks([chunk_id for chunk_id, _ in search_results])
+        chunk_ids = [chunk_id for chunk_id, _ in search_results]
+        chunks = self._get_chunks(chunk_ids)
         
         # Create initial results
         results = []

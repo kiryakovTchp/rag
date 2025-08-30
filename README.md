@@ -52,6 +52,24 @@ curl -X POST http://localhost:8000/query \
     "rerank": false,
     "max_ctx": 1800
   }'
+
+# Пример ответа:
+# {
+#   "matches": [
+#     {
+#       "doc_id": 1,
+#       "chunk_id": 5,
+#       "page": 2,
+#       "score": 0.85,
+#       "snippet": "Найденный текст...",
+#       "breadcrumbs": ["Глава 1", "Раздел 2"]
+#     }
+#   ],
+#   "usage": {
+#     "in_tokens": 5,
+#     "out_tokens": 150
+#   }
+# }
 ```
 
 ### 5. Остановка сервисов
@@ -85,6 +103,19 @@ make dev-down
 - **Embeddings**: BGE-M3 (1024-dimensional)
 - **Index**: PostgreSQL + pgvector
 - **Reranking**: Опционально через Workers AI
+
+#### Переменные окружения
+
+```bash
+# Embeddings
+EMBED_PROVIDER=local                    # local или workers_ai
+EMBED_BATCH_SIZE=64                     # Размер батча
+
+# Workers AI (опционально)
+WORKERS_AI_TOKEN=your_token_here        # API токен
+WORKERS_AI_URL=https://api.cloudflare.com/client/v4/ai/run/@cf/baai/bge-m3
+MODEL_ID=@cf/baai/bge-m3
+```
 
 ## Разработка
 

@@ -20,12 +20,12 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    # Create embeddings table
+    # Create embeddings table with proper vector type
     op.create_table('embeddings',
         sa.Column('chunk_id', sa.Integer(), nullable=False),
-        sa.Column('vector', sa.Text(), nullable=False),  # JSON array of floats
+        sa.Column('vector', sa.Text(), nullable=False),  # Will be converted to vector(1024)
         sa.Column('provider', sa.String(length=50), nullable=False),
-        sa.Column('created_at', sa.DateTime(), nullable=True),
+        sa.Column('created_at', sa.DateTime(timezone=True), nullable=True),
         sa.ForeignKeyConstraint(['chunk_id'], ['chunks.id'], ondelete='CASCADE'),
         sa.PrimaryKeyConstraint('chunk_id')
     )
@@ -33,10 +33,13 @@ def upgrade() -> None:
     # Create index on provider for faster lookups
     op.create_index(op.f('ix_embeddings_provider'), 'embeddings', ['provider'], unique=False)
 
+    # Convert vector column to proper pgvector type
+    op.execute("ALTER TABLE embeddings ALTER COLUMN vector TYPE vector(1024) USING (vector::vector)")
+
     # Create vector index for similarity search
     op.execute("""
-        CREATE INDEX IF NOT EXISTS idx_embeddings_vector 
-        ON embeddings USING ivfflat (vector vector_cosine_ops)
+        CREATE INDEX IF NOT EXISTS ix_embeddings_vector_ivfflat
+        ON embeddings USING ivfflat (vector vector_cosine_ops) WITH (lists = 100)
     """)
 
 

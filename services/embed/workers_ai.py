@@ -18,10 +18,15 @@ class WorkersAIEmbedder:
             api_token: Cloudflare Workers AI API token
             batch_size: Batch size for embedding generation
         """
-        self.api_token = api_token or os.getenv("CLOUDFLARE_API_TOKEN")
+        self.api_token = api_token or os.getenv("WORKERS_AI_TOKEN")
+        self.workers_url = os.getenv("WORKERS_AI_URL", "https://api.cloudflare.com/client/v4/ai/run/@cf/baai/bge-m3")
+        self.model_id = os.getenv("MODEL_ID", "@cf/baai/bge-m3")
+        
+        if not self.api_token:
+            raise ValueError("WORKERS_AI_TOKEN environment variable is required for Workers AI embedder")
+        
         self.batch_size = batch_size
         self.dimension = 1024
-        self.base_url = "https://api.cloudflare.com/client/v4/ai/run/@cf/baai/bge-m3"
         self.timeout = 30
         self.max_retries = 3
         self.retry_delay = 1
@@ -76,7 +81,7 @@ class WorkersAIEmbedder:
         for attempt in range(self.max_retries):
             try:
                 response = requests.post(
-                    self.base_url,
+                    self.workers_url,
                     json=payload,
                     headers=headers,
                     timeout=self.timeout
@@ -88,7 +93,7 @@ class WorkersAIEmbedder:
                         # Extract embeddings from response
                         embeddings = result.get("result", {}).get("embeddings", [])
                         if embeddings:
-                            # Convert to numpy array and normalize
+                            # Convert to numpy array and ensure float32
                             embeddings_array = np.array(embeddings, dtype=np.float32)
                             # L2 normalize
                             norms = np.linalg.norm(embeddings_array, axis=1, keepdims=True)
