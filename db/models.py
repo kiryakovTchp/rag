@@ -1,4 +1,5 @@
 from datetime import datetime
+import uuid
 
 from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.ext.declarative import declarative_base
@@ -71,3 +72,16 @@ class Chunk(Base):
     # Relationships
     document = relationship("Document", back_populates="chunks")
     element = relationship("Element", back_populates="chunks")
+
+
+
+class Embedding(Base):
+    __tablename__ = "embeddings"
+
+    chunk_id = Column(Integer, ForeignKey("chunks.id", ondelete="CASCADE"), primary_key=True)
+    vector = Column(Text, nullable=False)  # JSON array of floats
+    provider = Column(String(50), nullable=False)  # local, workers_ai
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+    # Relationships
+    chunk = relationship("Chunk", backref="embedding")
