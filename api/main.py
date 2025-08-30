@@ -5,6 +5,8 @@ from fastapi import FastAPI
 
 from api.routers.health import router as health_router
 from api.routers.ingest import router as ingest_router
+from api.routers.query import router as query_router
+from api.routers.admin import router as admin_router
 
 # Load environment variables from .env file
 env_path = Path(__file__).parent.parent / ".env"
@@ -14,3 +16,5 @@ app = FastAPI(title="PromoAI RAG API")
 
 app.include_router(health_router, prefix="")
 app.include_router(ingest_router, prefix="")
+app.include_router(query_router, prefix="")
+app.include_router(admin_router, prefix="")

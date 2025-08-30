@@ -4,6 +4,7 @@ from db.models import Chunk, Document, Element, Job
 from db.session import SessionLocal
 from services.chunking.pipeline import ChunkingPipeline
 from workers.app import celery_app
+from workers.tasks.index import index_document_embeddings
 
 logger = logging.getLogger(__name__)
 
@@ -89,6 +90,10 @@ def chunk_document(self, document_id: int) -> dict:
             job.progress = 100
             db.commit()
             logger.info(f"Updated job {job.id} status to done, progress: 100%")
+
+        # Trigger indexing task
+        logger.info(f"Triggering index task for document {document_id}")
+        index_document_embeddings.delay(document_id)
 
         return {
             "status": "success",
