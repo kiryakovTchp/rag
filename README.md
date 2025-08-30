@@ -115,6 +115,29 @@ EMBED_BATCH_SIZE=64                     # Размер батча
 WORKERS_AI_TOKEN=your_token_here        # API токен
 WORKERS_AI_URL=https://api.cloudflare.com/client/v4/ai/run/@cf/baai/bge-m3
 MODEL_ID=@cf/baai/bge-m3
+
+# Vector Search
+TOP_K=100                               # Количество результатов поиска
+RERANK_ENABLED=false                    # Включить reranking
+MAX_CTX_TOKENS=1800                     # Максимальный размер контекста
+```
+
+#### Примеры использования
+
+```bash
+# Поиск с настройками
+curl -X POST http://localhost:8000/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "query": "как работает система",
+    "top_k": 20,
+    "rerank": false,
+    "max_ctx": 1800
+  }'
+
+# Оптимизация поиска (для больших индексов)
+# Увеличить ivfflat.probes для лучшего качества:
+# SET ivfflat.probes = 20;
 ```
 
 ## Разработка

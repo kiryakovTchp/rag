@@ -130,9 +130,10 @@ class TestEmbedPGVector(unittest.TestCase):
         # Check embeddings shape
         self.assertEqual(embeddings.shape, (len(chunks), 1024))
         
-        # Index embeddings
+        # Index embeddings using chunk IDs only
+        chunk_ids = [chunk.id for chunk in chunks]
         provider = self.embedder.get_provider()
-        self.index.upsert_embeddings(chunks, embeddings, provider)
+        self.index.upsert_embeddings(chunk_ids, embeddings, provider)
         
         # Verify embeddings are stored
         stored_embeddings = self.db.query(Embedding).filter(

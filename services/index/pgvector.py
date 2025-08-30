@@ -53,10 +53,10 @@ class PGVectorIndex:
             """
             
             for chunk_id, vector in zip(chunk_ids, vectors):
-                # pgvector adapter will handle numpy array conversion
+                # pgvector adapter will handle numpy array conversion directly
                 db.execute(text(sql), {
                     "chunk_id": chunk_id,
-                    "vector": vector,
+                    "vector": vector,  # numpy array passed directly
                     "provider": provider
                 })
 

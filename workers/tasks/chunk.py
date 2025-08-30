@@ -91,10 +91,22 @@ def chunk_document(self, document_id: int) -> dict:
             db.commit()
             logger.info(f"Updated job {job.id} status to done, progress: 100%")
 
-                    # Trigger embedding task
-            logger.info(f"Triggering embed task for document {document_id}")
-            from workers.tasks.embed import embed_document
-            embed_document.delay(document_id)
+        # Create embed job and trigger embedding task
+        logger.info(f"Creating embed job for document {document_id}")
+        embed_job = Job(
+            type="embed",
+            status="queued",
+            progress=0,
+            document_id=document_id
+        )
+        db.add(embed_job)
+        db.commit()
+        logger.info(f"Created embed job {embed_job.id}")
+
+        # Trigger embedding task
+        logger.info(f"Triggering embed task for document {document_id}")
+        from workers.tasks.embed import embed_document
+        embed_document.apply_async(args=[document_id], queue="embed")
 
         return {
             "status": "success",

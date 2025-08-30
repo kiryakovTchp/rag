@@ -35,6 +35,7 @@ jobs:
       S3_BUCKET: promoai
       S3_ACCESS_KEY_ID: minio
       S3_SECRET_ACCESS_KEY: minio123
+      EMBED_PROVIDER: local
       PYTHONUNBUFFERED: "1"
     steps:
       - uses: actions/checkout@v4

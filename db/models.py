@@ -6,11 +6,7 @@ from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
 # Import pgvector Vector type
-try:
-    from pgvector.sqlalchemy import Vector
-except ImportError:
-    # Fallback for development without pgvector
-    Vector = Text
+from pgvector.sqlalchemy import Vector
 
 Base = declarative_base()
 
@@ -86,7 +82,7 @@ class Embedding(Base):
     __tablename__ = "embeddings"
 
     chunk_id = Column(Integer, ForeignKey("chunks.id", ondelete="CASCADE"), primary_key=True)
-    vector = Column(Vector(1024), nullable=False)  # pgvector vector(1024)
+    vector = Column(Vector(1024), nullable=False, index=False)  # pgvector vector(1024)
     provider = Column(String(50), nullable=False)  # local, workers_ai
     created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
 

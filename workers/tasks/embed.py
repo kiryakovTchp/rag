@@ -82,18 +82,22 @@ def embed_document(document_id: int) -> dict:
             job.progress = progress
             db.commit()
             
-            # Get chunk texts
+            # Get chunk texts and IDs
             chunk_texts = [chunk.text for chunk in batch_chunks]
             chunk_ids = [chunk.id for chunk in batch_chunks]
             
-            # Generate embeddings
+            # Generate embeddings as numpy array
             logger.info(f"Generating embeddings for batch {i//batch_size + 1}")
             embeddings = embedder.embed_texts(chunk_texts)
             
-            if len(embeddings) != len(batch_chunks):
-                raise ValueError(f"Embedding count mismatch: {len(embeddings)} != {len(batch_chunks)}")
+            # Ensure embeddings is numpy array with correct shape
+            if not isinstance(embeddings, np.ndarray):
+                embeddings = np.array(embeddings, dtype=np.float32)
             
-            # Upsert embeddings
+            if embeddings.shape != (len(batch_chunks), 1024):
+                raise ValueError(f"Embedding shape mismatch: {embeddings.shape} != ({len(batch_chunks)}, 1024)")
+            
+            # Upsert embeddings using chunk IDs only
             provider = embedder.get_provider()
             index.upsert_embeddings(chunk_ids, embeddings, provider)
             

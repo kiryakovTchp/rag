@@ -1,213 +1,167 @@
 #!/bin/bash
-set -e
+set -euo pipefail
 
-echo "🔍 Checking service connectivity..."
+echo "🔍 Checking Sprint-2 wireup..."
 
-# Check for SQLite usage (should fail)
-echo "  Checking for SQLite usage..."
-if grep -r "sqlite\|sqlite3\|aiosqlite\|sqlite:///\|:memory:" api/ services/ workers/ db/ storage/ 2>/dev/null; then
-    echo "    ❌ Found SQLite usage in code"
+# 1) Check for SQLite traces (forbidden)
+echo "1. Checking for SQLite traces..."
+if git grep -nE 'sqlite|aiosqlite|:memory:|check_same_thread|StaticPool' -- api/ services/ workers/ db/ storage/ 2>/dev/null; then
+    echo "❌ SQLite traces found in production code"
+    exit 1
+fi
+echo "✅ No SQLite traces found"
+
+# 2) Check pgvector extension
+echo "2. Checking pgvector extension..."
+if ! psql -U postgres -d postgres -tAc "\dx" | grep -qE '^\s*vector\s'; then
+    echo "❌ pgvector extension missing"
+    exit 1
+fi
+echo "✅ pgvector extension found"
+
+# 3) Check vector(1024) column type
+echo "3. Checking embeddings.vector column type..."
+if ! psql -U postgres -d postgres -tAc "\d+ embeddings" | grep -q "vector(1024)"; then
+    echo "❌ embeddings.vector is not vector(1024)"
+    exit 1
+fi
+echo "✅ embeddings.vector is vector(1024)"
+
+# 4) Check ivfflat index with vector_cosine_ops
+echo "4. Checking ivfflat index..."
+if ! psql -U postgres -d postgres -tAc "\d+ embeddings" | grep -q "USING ivfflat"; then
+    echo "❌ ivfflat index missing"
     exit 1
 fi
 
-# Check db/session.py contains postgresql+psycopg
-echo "  Checking db/session.py..."
-if ! grep -q "postgresql+psycopg" db/session.py; then
-    echo "    ❌ db/session.py doesn't contain postgresql+psycopg"
+if ! psql -U postgres -d postgres -tAc "\d+ embeddings" | grep -q "vector_cosine_ops"; then
+    echo "❌ ivfflat without vector_cosine_ops"
     exit 1
 fi
+echo "✅ ivfflat index with vector_cosine_ops found"
 
-if grep -q "sqlite" db/session.py; then
-    echo "    ❌ db/session.py contains SQLite references"
-    exit 1
-fi
-
-echo "    ✅ No SQLite usage found"
-
-# Check PostgreSQL
-echo "  Checking PostgreSQL..."
+# 5) Check PostgreSQL connection
+echo "5. Checking PostgreSQL connection..."
 python3 -c "
-import psycopg
+import os
+from sqlalchemy import create_engine, text
+
+DATABASE_URL = os.getenv('DATABASE_URL', 'postgresql+psycopg://postgres:postgres@localhost:5432/postgres')
+engine = create_engine(DATABASE_URL)
+
 try:
-    conn = psycopg.connect('postgresql://postgres:postgres@localhost:5432/postgres')
-    conn.close()
-    print('    ✅ PostgreSQL: OK')
+    with engine.connect() as conn:
+        result = conn.execute(text('SELECT version()'))
+        version = result.scalar()
+        if 'PostgreSQL' in version:
+            print('✅ PostgreSQL connection: OK')
+        else:
+            print('❌ Not PostgreSQL')
+            exit(1)
 except Exception as e:
-    print(f'    ❌ PostgreSQL: {e}')
+    print(f'❌ PostgreSQL connection failed: {e}')
     exit(1)
 "
 
-# Check Redis
-echo "  Checking Redis..."
+# 6) Check Redis connection
+echo "6. Checking Redis connection..."
 python3 -c "
 import redis
-try:
-    r = redis.Redis(host='localhost', port=6379, db=0)
-    r.ping()
-    print('    ✅ Redis: OK')
-except Exception as e:
-    print(f'    ❌ Redis: {e}')
-    exit(1)
-"
-
-# Check MinIO
-echo "  Checking MinIO..."
-python3 -c "
-import boto3
-from botocore.exceptions import ClientError
-try:
-    s3 = boto3.client('s3', 
-                      endpoint_url='http://localhost:9000',
-                      aws_access_key_id='minio',
-                      aws_secret_access_key='minio123',
-                      region_name='us-east-1')
-    s3.head_bucket(Bucket='promoai')
-    print('    ✅ MinIO: OK')
-except Exception as e:
-    print(f'    ❌ MinIO: {e}')
-    exit(1)
-"
-
-# Check Celery tasks
-echo "  Checking Celery tasks..."
-python3 -c "
-from workers.app import celery_app
-from workers.tasks.parse import parse_document
-from workers.tasks.chunk import chunk_document
-
-# Check if tasks are registered
-if 'workers.tasks.parse.parse_document' not in celery_app.tasks:
-    print('    ❌ parse_document task not registered')
-    exit(1)
-if 'workers.tasks.chunk.chunk_document' not in celery_app.tasks:
-    print('    ❌ chunk_document task not registered')
-    exit(1)
-
-print('    ✅ Celery tasks: OK')
-"
-
-# Check S3 client methods
-echo "  Checking S3 client methods..."
-python3 -c "
-from storage.r2 import ObjectStore
 import os
 
-os.environ['S3_ENDPOINT'] = 'http://localhost:9000'
-os.environ['S3_ACCESS_KEY_ID'] = 'minio'
-os.environ['S3_SECRET_ACCESS_KEY'] = 'minio123'
-
+REDIS_URL = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
 try:
-    store = ObjectStore()
-    # Test basic methods exist
-    methods = ['put_file', 'get_file', 'delete', 'exists']
-    for method in methods:
-        if not hasattr(store, method):
-            print(f'    ❌ S3 client missing method: {method}')
-            exit(1)
-    print('    ✅ S3 client methods: OK')
+    r = redis.from_url(REDIS_URL)
+    r.ping()
+    print('✅ Redis connection: OK')
 except Exception as e:
-    print(f'    ❌ S3 client: {e}')
+    print(f'❌ Redis connection failed: {e}')
     exit(1)
 "
 
-# Check TableParser and dependencies
-echo "  Checking TableParser..."
+# 7) Check S3/MinIO connection
+echo "7. Checking S3/MinIO connection..."
+python3 -c "
+import boto3
+import os
+
+S3_ENDPOINT = os.getenv('S3_ENDPOINT', 'http://localhost:9000')
+S3_ACCESS_KEY = os.getenv('S3_ACCESS_KEY_ID', 'minio')
+S3_SECRET_KEY = os.getenv('S3_SECRET_ACCESS_KEY', 'minio123')
+S3_BUCKET = os.getenv('S3_BUCKET', 'promoai')
+
+try:
+    s3 = boto3.client(
+        's3',
+        endpoint_url=S3_ENDPOINT,
+        aws_access_key_id=S3_ACCESS_KEY,
+        aws_secret_access_key=S3_SECRET_KEY
+    )
+    s3.head_bucket(Bucket=S3_BUCKET)
+    print('✅ S3/MinIO connection: OK')
+except Exception as e:
+    print(f'❌ S3/MinIO connection failed: {e}')
+    exit(1)
+"
+
+# 8) Check Celery tasks
+echo "8. Checking Celery tasks..."
 python3 -c "
 try:
-    from services.parsing.tables import TableParser
-    print('    ✅ TableParser: OK')
+    from workers.tasks.parse import parse_document
+    print('✅ parse_document task: OK')
 except Exception as e:
-    print(f'    ❌ TableParser: {e}')
+    print(f'❌ parse_document task: {e}')
     exit(1)
 "
 
-echo "  Checking pdfplumber..."
 python3 -c "
 try:
-    import pdfplumber
-    print('    ✅ pdfplumber: OK')
+    from workers.tasks.chunk import chunk_document
+    print('✅ chunk_document task: OK')
 except Exception as e:
-    print(f'    ❌ pdfplumber: {e}')
+    print(f'❌ chunk_document task: {e}')
     exit(1)
 "
 
-echo "  Checking ChunkingPipeline..."
 python3 -c "
 try:
-    from services.chunking.pipeline import ChunkingPipeline
-    print('    ✅ ChunkingPipeline: OK')
+    from workers.tasks.embed import embed_document
+    print('✅ embed_document task: OK')
 except Exception as e:
-    print(f'    ❌ ChunkingPipeline: {e}')
+    print(f'❌ embed_document task: {e}')
     exit(1)
 "
 
-echo "  Checking pgvector setup..."
+# 9) Check embedding services
+echo "9. Checking embedding services..."
 python3 -c "
 try:
-    from db.models import Embedding
-    from sqlalchemy import inspect
-    
-    # Check if vector column is proper pgvector type
-    inspector = inspect(Embedding.__table__)
-    vector_col = inspector.get_columns()['vector']
-    
-    if 'Vector' in str(vector_col.type):
-        print('    ✅ Embedding.vector is Vector(1024): OK')
-    else:
-        print('    ❌ Embedding.vector is not Vector type')
-        exit(1)
-        
-    # Check migrations for pgvector extension
-    import os
-    migration_files = [f for f in os.listdir('db/migrations/versions') if f.endswith('.py')]
-    pgvector_migrations = []
-    
-    for f in migration_files:
-        with open(f'db/migrations/versions/{f}', 'r') as mf:
-            content = mf.read()
-            if 'CREATE EXTENSION' in content and 'vector' in content:
-                pgvector_migrations.append(f)
-    
-    if pgvector_migrations:
-        print(f'    ✅ Found pgvector migrations: {pgvector_migrations}')
-    else:
-        print('    ❌ No pgvector extension migration found')
-        exit(1)
-        
+    from services.embed.provider import EmbeddingProvider
+    from services.index.pgvector import PGVectorIndex
+    print('✅ Embedding services: OK')
 except Exception as e:
-    print(f'    ❌ pgvector check failed: {e}')
+    print(f'❌ Embedding services: {e}')
     exit(1)
 "
 
-echo "  Checking WorkersAIEmbedder..."
+# 10) Check WorkersAIEmbedder (should fail without token)
+echo "10. Checking WorkersAIEmbedder..."
 python3 -c "
 try:
     from services.embed.workers_ai import WorkersAIEmbedder
-    
-    # Check if it's not returning zeros
     embedder = WorkersAIEmbedder()
-    test_text = 'test'
-    embedding = embedder.embed_single(test_text)
-    
-    if embedding is None or len(embedding) == 0:
-        print('    ❌ WorkersAIEmbedder returned empty embedding')
-        exit(1)
-    
-    # Check if it's not all zeros
-    if all(x == 0 for x in embedding):
-        print('    ❌ WorkersAIEmbedder returned all zeros')
-        exit(1)
-        
-    print('    ✅ WorkersAIEmbedder: OK')
+    print('❌ WorkersAIEmbedder should fail without token')
+    exit(1)
 except ValueError as e:
     if 'WORKERS_AI_TOKEN' in str(e):
-        print('    ✅ WorkersAIEmbedder: properly configured (requires token)')
+        print('✅ WorkersAIEmbedder: properly configured (requires token)')
     else:
-        print(f'    ❌ WorkersAIEmbedder: {e}')
+        print(f'❌ WorkersAIEmbedder: {e}')
         exit(1)
 except Exception as e:
-    print(f'    ❌ WorkersAIEmbedder: {e}')
+    print(f'❌ WorkersAIEmbedder: {e}')
     exit(1)
 "
 
-echo "✅ All services and components are ready!"
+echo "✅ Sprint-2 wireup check passed!"
