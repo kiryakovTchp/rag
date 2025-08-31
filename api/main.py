@@ -11,6 +11,7 @@ from api.routers.query import router as query_router
 from api.routers.answer import router as answer_router
 from api.routers.feedback import router as feedback_router
 from api.websocket import router as websocket_router
+from api.metrics import metrics_endpoint
 
 # Load environment variables from .env file
 env_path = Path(__file__).parent.parent / ".env"
@@ -34,6 +35,9 @@ app.include_router(query_router, prefix="")
 app.include_router(answer_router, prefix="")
 app.include_router(feedback_router, prefix="")
 app.include_router(websocket_router, prefix="")
+
+# Add metrics endpoint
+app.add_api_route("/metrics", metrics_endpoint, methods=["GET"])
 
 # Include admin router only if explicitly enabled
 if os.getenv("ADMIN_API_ENABLED", "false").lower() == "true":
