@@ -2,11 +2,16 @@
 
 import jwt
 import os
+import hashlib
 from typing import Optional, Dict, Any
-from fastapi import HTTPException, Depends, Request, WebSocket
+from fastapi import HTTPException, Depends, Request, WebSocket, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.orm import Session
 
-security = HTTPBearer()
+from db.session import get_db
+from db.models import APIKey
+
+security = HTTPBearer(auto_error=False)
 
 async def get_current_user_ws(websocket: WebSocket) -> Optional[Dict[str, Any]]:
     """Get current user from WebSocket connection."""
@@ -22,36 +27,110 @@ async def get_current_user_ws(websocket: WebSocket) -> Optional[Dict[str, Any]]:
         if not token:
             return None
         
-        # Validate JWT token
-        secret = os.getenv("NEXTAUTH_SECRET")
-        if not secret:
-            return None
+        # Try JWT first, then API key
+        user = await validate_jwt_token(token)
+        if user:
+            return user
         
-        try:
-            payload = jwt.decode(token, secret, algorithms=["HS256"])
-            return payload
-        except jwt.InvalidTokenError:
-            return None
+        # Try API key
+        user = await validate_api_key(token)
+        if user:
+            return user
+            
+        return None
             
     except Exception:
         return None
 
-async def get_current_user(request: Request) -> Dict[str, Any]:
+async def get_current_user(request: Request, db: Session = Depends(get_db)) -> Dict[str, Any]:
     """Get current user from request."""
-    # For now, return a mock user
-    # Will be implemented with proper JWT validation
-    return {
-        "tenant_id": "test_tenant",
-        "user_id": "test_user",
-        "role": "user"
-    }
+    if not require_auth():
+        return {
+            "tenant_id": "anonymous",
+            "user_id": "anonymous",
+            "role": "user"
+        }
+    
+    # Get authorization header
+    auth_header = request.headers.get("authorization")
+    if not auth_header:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Authorization header required"
+        )
+    
+    if not auth_header.startswith("Bearer "):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid authorization header format"
+        )
+    
+    token = auth_header[7:]
+    
+    # Try JWT first
+    user = await validate_jwt_token(token)
+    if user:
+        return user
+    
+    # Try API key
+    user = await validate_api_key(token, db)
+    if user:
+        return user
+    
+    raise HTTPException(
+        status_code=status.HTTP_401_UNAUTHORIZED,
+        detail="Invalid token or API key"
+    )
 
-async def get_current_user_optional(request: Request) -> Optional[Dict[str, Any]]:
+async def get_current_user_optional(request: Request, db: Session = Depends(get_db)) -> Optional[Dict[str, Any]]:
     """Get current user from request (optional)."""
+    if not require_auth():
+        return {
+            "tenant_id": "anonymous",
+            "user_id": "anonymous",
+            "role": "user"
+        }
+    
     try:
-        return await get_current_user(request)
-    except:
+        return await get_current_user(request, db)
+    except HTTPException:
         return None
+
+async def validate_jwt_token(token: str) -> Optional[Dict[str, Any]]:
+    """Validate JWT token."""
+    secret = os.getenv("NEXTAUTH_SECRET")
+    if not secret:
+        return None
+    
+    try:
+        payload = jwt.decode(token, secret, algorithms=["HS256"])
+        return {
+            "tenant_id": payload.get("tenant_id"),
+            "user_id": payload.get("user_id"),
+            "role": payload.get("role", "user")
+        }
+    except jwt.InvalidTokenError:
+        return None
+
+async def validate_api_key(api_key: str, db: Session) -> Optional[Dict[str, Any]]:
+    """Validate API key."""
+    # Hash the API key
+    key_hash = hashlib.sha256(api_key.encode()).hexdigest()
+    
+    # Check if key exists and is not revoked
+    db_key = db.query(APIKey).filter(
+        APIKey.key_hash == key_hash,
+        APIKey.revoked_at.is_(None)
+    ).first()
+    
+    if not db_key:
+        return None
+    
+    return {
+        "tenant_id": db_key.tenant_id,
+        "user_id": f"api_key_{db_key.id}",
+        "role": db_key.role
+    }
 
 def require_auth() -> bool:
     """Check if authentication is required."""

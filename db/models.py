@@ -103,3 +103,14 @@ class AnswerLog(Base):
     latency_ms = Column(Integer, nullable=False)
     cost_usd = Column(String(20), nullable=True)  # Decimal as string
     created_at = Column(DateTime, default=func.now())
+
+
+class APIKey(Base):
+    __tablename__ = "api_keys"
+
+    id = Column(Integer, primary_key=True, index=True)
+    key_hash = Column(String(255), nullable=False, unique=True, index=True)
+    tenant_id = Column(String(100), nullable=False, index=True)
+    role = Column(String(50), nullable=False, server_default="user")
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
