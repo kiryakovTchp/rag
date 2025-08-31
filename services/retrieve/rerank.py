@@ -30,6 +30,7 @@ class WorkersAIReranker:
         """
         if not self.api_token:
             print("⚠️ Workers AI reranker not available: no API token")
+            print("⚠️ WARNING: Falling back to original order - no reranking applied")
             return list(range(min(top_k, len(pairs))))
         
         if not pairs:
@@ -85,4 +86,5 @@ class WorkersAIReranker:
                 break
         
         # Fallback to original order
+        print("⚠️ WARNING: Reranking failed, falling back to original order - no reranking applied")
         return list(range(min(top_k, len(pairs))))

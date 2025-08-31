@@ -46,7 +46,7 @@ def upgrade() -> None:
 def downgrade() -> None:
     """Downgrade schema."""
     # Drop vector index
-    op.execute("DROP INDEX IF EXISTS idx_embeddings_vector")
+    op.execute("DROP INDEX IF EXISTS ix_embeddings_vector_ivfflat")
     
     # Drop provider index
     op.drop_index(op.f('ix_embeddings_provider'), table_name='embeddings')

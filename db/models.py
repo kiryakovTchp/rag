@@ -1,7 +1,7 @@
 from datetime import datetime
 import uuid
 
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text
+from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text, func
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 
@@ -19,7 +19,7 @@ class Document(Base):
     mime = Column(String(100), nullable=False)
     storage_uri = Column(String(500), nullable=False)
     status = Column(String(50), default="uploaded")  # uploaded, processing, done, error
-    created_at = Column(DateTime, default=datetime.utcnow)
+    created_at = Column(DateTime, default=func.now())
 
     # Relationships
     jobs = relationship("Job", back_populates="document")
@@ -36,8 +36,8 @@ class Job(Base):
     progress = Column(Integer, default=0)  # 0-100
     error = Column(Text, nullable=True)
     document_id = Column(Integer, ForeignKey("documents.id"), nullable=False)
-    created_at = Column(DateTime, default=datetime.utcnow)
-    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    created_at = Column(DateTime, default=func.now())
+    updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
     # Relationships
     document = relationship("Document", back_populates="jobs")
@@ -84,7 +84,7 @@ class Embedding(Base):
     chunk_id = Column(Integer, ForeignKey("chunks.id", ondelete="CASCADE"), primary_key=True)
     vector = Column(Vector(1024), nullable=False, index=False)  # pgvector vector(1024)
     provider = Column(String(50), nullable=False)  # local, workers_ai
-    created_at = Column(DateTime(timezone=True), default=datetime.utcnow)
+    created_at = Column(DateTime(timezone=True), default=func.now())
 
     # Relationships
     chunk = relationship("Chunk", backref="embedding")

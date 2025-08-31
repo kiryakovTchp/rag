@@ -174,13 +174,13 @@ class TestEmbedPGVector(unittest.TestCase):
         provider = self.embedder.get_provider()
         
         # First upsert
-        self.index.upsert_embeddings([chunk], embedding.reshape(1, -1), provider)
+        self.index.upsert_embeddings([chunk.id], embedding.reshape(1, -1), provider)
         
         # Count embeddings
         count1 = self.db.query(Embedding).filter(Embedding.chunk_id == chunk.id).count()
         
         # Second upsert (should not create duplicate)
-        self.index.upsert_embeddings([chunk], embedding.reshape(1, -1), provider)
+        self.index.upsert_embeddings([chunk.id], embedding.reshape(1, -1), provider)
         
         # Count should be the same
         count2 = self.db.query(Embedding).filter(Embedding.chunk_id == chunk.id).count()
