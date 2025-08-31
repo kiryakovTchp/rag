@@ -73,11 +73,17 @@ class PGVectorIndex:
         Returns:
             List of (chunk_id, score) tuples sorted by score DESC
         """
+        import os
+        
         # Ensure query vector is float32
         query_vector = query_vector.astype(np.float32)
+        
+        # Get probes from environment
+        probes = int(os.getenv("IVFFLAT_PROBES", "10"))
 
         # SQL query using cosine similarity with L2 normalization
         sql = """
+        SET LOCAL ivfflat.probes = COALESCE(:probes, 10);
         SELECT e.chunk_id, 
                1 - (e.vector <=> :query_vector) as score
         FROM embeddings e
@@ -86,7 +92,11 @@ class PGVectorIndex:
         """
 
         with engine.connect() as conn:
-            result = conn.execute(text(sql), {"query_vector": query_vector, "top_k": top_k})
+            result = conn.execute(text(sql), {
+                "query_vector": query_vector, 
+                "top_k": top_k,
+                "probes": probes
+            })
 
             results = []
             for row in result:

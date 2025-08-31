@@ -70,26 +70,32 @@ def index_document_embeddings(self, document_id: int) -> dict:
         # Generate embeddings in batches
         all_embeddings = []
         batch_size = embedder.batch_size
+        total_chunks = len(chunk_texts)
+        processed = 0
         
-        for i in range(0, len(chunk_texts), batch_size):
+        for i in range(0, total_chunks, batch_size):
             batch_texts = chunk_texts[i:i + batch_size]
             batch_embeddings = embedder.embed_texts(batch_texts)
             all_embeddings.extend(batch_embeddings)
+            
+            processed += len(batch_texts)
+            
+            # Update progress
+            progress = int((processed / total_chunks) * 100)
+            current_task.update_state(
+                state="RUNNING",
+                meta={
+                    "status": "processing",
+                    "document_id": document_id,
+                    "progress": progress
+                }
+            )
+            
+            print(f"Processed {processed}/{total_chunks} chunks (progress: {progress}%)")
         
         # Convert to numpy array
         import numpy as np
         all_embeddings = np.array(all_embeddings, dtype=np.float32)
-        
-        # Update progress
-        progress = min(100, int((len(chunk_texts)) / len(chunk_texts) * 100))
-        current_task.update_state(
-            state="RUNNING",
-            meta={
-                "status": "processing",
-                "document_id": document_id,
-                "progress": progress
-            }
-        )
         
         # Upsert embeddings
         provider = embedder.get_provider()

@@ -100,52 +100,64 @@ for i in {1..60}; do
 done
 
 # Check for embed job
-echo "5. Checking embed job..."
-EMBED_JOBS=$(curl -s http://localhost:8000/ingest/$JOB_ID | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-jobs = data.get('jobs', [])
-embed_jobs = [j for j in jobs if j.get('type') == 'embed']
-print(len(embed_jobs))
-")
+    # Wait for embed job to complete using document status
+    echo "5. Checking embed job..."
+    DOCUMENT_ID=$(curl -s http://localhost:8000/ingest/$JOB_ID | python3 -c "
+    import sys, json
+    data = json.load(sys.stdin)
+    print(data.get('document_id', ''))
+    ")
 
-if [ "$EMBED_JOBS" -gt 0 ]; then
-    echo "   ✅ Embed job created"
-else
-    echo "   ❌ No embed job found"
-    exit 1
-fi
-
-# Wait for embed job to complete
-echo "   Waiting for embed job to complete..."
-for i in {1..60}; do
-    STATUS_RESPONSE=$(curl -s http://localhost:8000/ingest/$JOB_ID)
-    EMBED_STATUS=$(echo $STATUS_RESPONSE | python3 -c "
-import sys, json
-data = json.load(sys.stdin)
-jobs = data.get('jobs', [])
-embed_jobs = [j for j in jobs if j.get('type') == 'embed']
-if embed_jobs:
-    print(embed_jobs[0].get('status', 'unknown'))
-else:
-    print('not_found')
-")
-    
-    if [ "$EMBED_STATUS" = "done" ]; then
-        echo "   ✅ Embed job completed"
-        break
-    elif [ "$EMBED_STATUS" = "error" ]; then
-        echo "   ❌ Embed job failed"
+    if [ -z "$DOCUMENT_ID" ]; then
+        echo "   ❌ No document_id found"
         exit 1
     fi
-    
-    if [ $i -eq 60 ]; then
-        echo "   ❌ Embed job timeout"
+
+    EMBED_JOBS=$(curl -s http://localhost:8000/ingest/document/$DOCUMENT_ID | python3 -c "
+    import sys, json
+    data = json.load(sys.stdin)
+    jobs = data.get('jobs', [])
+    embed_jobs = [j for j in jobs if j.get('type') == 'embed']
+    print(len(embed_jobs))
+    ")
+
+    if [ "$EMBED_JOBS" -gt 0 ]; then
+        echo "   ✅ Embed job created"
+    else
+        echo "   ❌ No embed job found"
         exit 1
     fi
-    
-    sleep 1
-done
+
+    # Wait for embed job to complete
+    echo "   Waiting for embed job to complete..."
+    for i in {1..60}; do
+        STATUS_RESPONSE=$(curl -s http://localhost:8000/ingest/document/$DOCUMENT_ID)
+        EMBED_STATUS=$(echo $STATUS_RESPONSE | python3 -c "
+    import sys, json
+    data = json.load(sys.stdin)
+    jobs = data.get('jobs', [])
+    embed_jobs = [j for j in jobs if j.get('type') == 'embed']
+    if embed_jobs:
+        print(embed_jobs[0].get('status', 'unknown'))
+    else:
+        print('not_found')
+    ")
+
+        if [ "$EMBED_STATUS" = "done" ]; then
+            echo "   ✅ Embed job completed"
+            break
+        elif [ "$EMBED_STATUS" = "error" ]; then
+            echo "   ❌ Embed job failed"
+            exit 1
+        fi
+
+        if [ $i -eq 60 ]; then
+            echo "   ❌ Embed job timeout"
+            exit 1
+        fi
+
+        sleep 1
+    done
 
 # Test PGVectorIndex directly
 echo "6. Testing PGVectorIndex directly..."

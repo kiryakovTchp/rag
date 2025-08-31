@@ -210,4 +210,17 @@ except Exception as e:
         exit(1)
     "
 
+    # 13) Check admin router is not enabled by default
+    echo "13. Checking admin router is not enabled by default..."
+    if [ "$ADMIN_API_ENABLED" = "true" ] && [ -z "$ADMIN_API_TOKEN" ]; then
+        echo "❌ ADMIN_API_ENABLED=true without ADMIN_API_TOKEN"
+        exit 1
+    fi
+    
+    if [ "$ADMIN_API_ENABLED" != "true" ]; then
+        echo "✅ Admin router disabled by default"
+    else
+        echo "✅ Admin router enabled with token"
+    fi
+
 echo "✅ Sprint-2 wireup check passed!"

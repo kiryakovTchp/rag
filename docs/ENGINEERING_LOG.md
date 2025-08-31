@@ -41,6 +41,14 @@
 - Эффект/риски: + Полнофункциональный RAG без LLM. + Высокое качество поиска. + Опциональный reranking. + Готовность к Sprint 3. - Сложность отладки. - Зависимость от Workers AI для reranking.
 - Следующие шаги: Sprint 3 - LLM интеграция и генерация ответов
 
+## 2025-01-27 (Sprint 2 - Finalization)
+- Дата: 2025-01-27
+- Что сделано: S2 finalized: admin off by default, progress fixed, status endpoint unified, pgvector probes, stronger wireup
+- Почему так: Нужно было убрать "сказки" и сделать e2e пайплайн стабильно работающим без временных роутов и метрик "для красоты"
+- Как работает: Admin router включается только с ADMIN_API_ENABLED=true+TOKEN, реальный progress в embed/index tasks, единый /ingest/document/{id} endpoint, IVFFLAT_PROBES настройка, жёсткие wire-up проверки
+- Эффект/риски: + Продакшен-готовый Sprint 2. + Стабильный e2e пайплайн. + Правильные метрики прогресса. + Безопасность админ API. - Сложность отладки без админ роутов.
+- Следующие шаги: Sprint 3 - LLM слой с провайдерами, prompt engineering, streaming responses
+
 Шаблон записи:
 - Дата:
 - Что сделано:

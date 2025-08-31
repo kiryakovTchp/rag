@@ -120,6 +120,14 @@ MODEL_ID=@cf/baai/bge-m3
 TOP_K=100                               # Количество результатов поиска
 RERANK_ENABLED=false                    # Включить reranking
 MAX_CTX_TOKENS=1800                     # Максимальный размер контекста
+
+# pgvector Tuning
+IVFFLAT_LISTS=100                       # Количество списков в ivfflat индексе
+IVFFLAT_PROBES=10                       # Количество проб для поиска (10-20)
+
+# Admin API (опционально)
+ADMIN_API_ENABLED=false                 # Включить админ API
+ADMIN_API_TOKEN=your_admin_token        # Токен для админ API
 ```
 
 #### Примеры использования
@@ -138,6 +146,88 @@ curl -X POST http://localhost:8000/query \
 # Оптимизация поиска (для больших индексов)
 # Увеличить ivfflat.probes для лучшего качества:
 # SET ivfflat.probes = 20;
+```
+
+## How to check status
+
+### Document Status
+
+Для получения статуса документа со всеми jobs:
+
+```bash
+# Получить статус документа
+curl http://localhost:8000/ingest/document/{document_id}
+
+# Пример ответа:
+{
+  "document_id": 1,
+  "status": "done",
+  "jobs": [
+    {
+      "id": 1,
+      "type": "parse",
+      "status": "done",
+      "progress": 100,
+      "document_id": 1,
+      "created_at": "2024-01-01T10:00:00",
+      "updated_at": "2024-01-01T10:01:00"
+    },
+    {
+      "id": 2,
+      "type": "chunk",
+      "status": "done", 
+      "progress": 100,
+      "document_id": 1,
+      "created_at": "2024-01-01T10:01:00",
+      "updated_at": "2024-01-01T10:02:00"
+    },
+    {
+      "id": 3,
+      "type": "embed",
+      "status": "done",
+      "progress": 100,
+      "document_id": 1,
+      "created_at": "2024-01-01T10:02:00",
+      "updated_at": "2024-01-01T10:03:00"
+    }
+  ]
+}
+```
+
+### Job Status
+
+Для получения статуса конкретного job:
+
+```bash
+curl http://localhost:8000/ingest/{job_id}
+```
+
+## How to tune vector search
+
+### pgvector Parameters
+
+- **IVFFLAT_LISTS**: Количество списков в ivfflat индексе (по умолчанию 100)
+  - Больше списков = лучше качество, медленнее поиск
+  - Меньше списков = быстрее поиск, хуже качество
+
+- **IVFFLAT_PROBES**: Количество проб для поиска (по умолчанию 10)
+  - Больше проб = лучше качество, медленнее поиск
+  - Рекомендуется 10-20 для большинства случаев
+  - Для больших индексов можно увеличить до 50-100
+
+### Tuning Guidelines
+
+```bash
+# Для высокого качества (медленнее)
+IVFFLAT_PROBES=20
+
+# Для высокой скорости (хуже качество)
+IVFFLAT_PROBES=5
+
+# Для больших индексов (>1M векторов)
+IVFFLAT_LISTS=1000
+IVFFLAT_PROBES=50
+```
 ```
 
 ## Разработка

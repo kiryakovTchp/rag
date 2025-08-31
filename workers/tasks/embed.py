@@ -83,11 +83,6 @@ def embed_document(self, document_id: int) -> dict:
         for i in range(0, total_chunks, batch_size):
             batch_chunks = chunks[i:i + batch_size]
             
-            # 5) обновлять progress по мере батчей
-            progress = int((processed / total_chunks) * 100)
-            job.progress = progress
-            session.commit()
-            
             chunk_texts = [chunk.text for chunk in batch_chunks]
             chunk_ids = [chunk.id for chunk in batch_chunks]
             
@@ -106,7 +101,13 @@ def embed_document(self, document_id: int) -> dict:
             index.upsert_embeddings(chunk_ids, embeddings, provider)
             
             processed += len(batch_chunks)
-            logger.info(f"Processed {processed}/{total_chunks} chunks")
+            
+            # 5) обновлять progress по мере батчей
+            progress = int((processed / total_chunks) * 100)
+            job.progress = progress
+            session.commit()
+            
+            logger.info(f"Processed {processed}/{total_chunks} chunks (progress: {progress}%)")
         
         # 6) status='done'
         job.status = "done"
