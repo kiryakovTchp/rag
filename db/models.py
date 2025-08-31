@@ -114,3 +114,16 @@ class APIKey(Base):
     role = Column(String(50), nullable=False, server_default="user")
     created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
     revoked_at = Column(DateTime(timezone=True), nullable=True)
+
+
+class AnswerFeedback(Base):
+    __tablename__ = "answer_feedback"
+
+    id = Column(Integer, primary_key=True, index=True)
+    answer_id = Column(String(100), nullable=False, index=True)
+    tenant_id = Column(String(100), nullable=False, index=True)
+    user_id = Column(String(100), nullable=True, index=True)
+    rating = Column(Enum('up', 'down', name='feedback_rating'), nullable=False)
+    reason = Column(Text, nullable=True)
+    selected_citation_ids = Column(ARRAY(Integer), nullable=True)
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
