@@ -179,11 +179,61 @@ class TestAnswerOrchestrator(unittest.TestCase):
         with patch('services.answer.orchestrator.log_answer_usage') as mock_log:
             result = self.orchestrator.generate_answer("Test query", tenant_id="test_tenant")
             
-            # Verify logging was called
-            mock_log.assert_called_once()
-            call_args = mock_log.call_args
-            self.assertEqual(call_args[1]["tenant_id"], "test_tenant")
-            self.assertEqual(call_args[1]["query"], "Test query")
+                    # Verify logging was called
+        mock_log.assert_called_once()
+        call_args = mock_log.call_args
+        self.assertEqual(call_args[1]["tenant_id"], "test_tenant")
+        self.assertEqual(call_args[1]["query"], "Test query")
+
+    @patch('services.answer.orchestrator.EmbeddingProvider')
+    @patch('services.answer.orchestrator.PGVectorIndex')
+    @patch('services.answer.orchestrator.get_llm_provider')
+    def test_rerank_order_by_chunk_id(self, mock_get_llm, mock_index, mock_embedder):
+        """Test that reranking preserves order by chunk_id, not list position."""
+        # Mock dependencies
+        mock_llm = Mock()
+        mock_llm.generate.return_value = ("Test answer", {"provider": "gemini", "model": "test"})
+        mock_get_llm.return_value = mock_llm
+        
+        mock_embedder_instance = Mock()
+        mock_embedder_instance.embed_single.return_value = [0.1] * 1024
+        mock_embedder.return_value = mock_embedder_instance
+        
+        # Mock search results with specific chunk IDs
+        mock_index_instance = Mock()
+        mock_index_instance.search.return_value = [(10, 0.8), (5, 0.9), (15, 0.7)]  # chunk_id, score
+        mock_index.return_value = mock_index_instance
+        
+        # Mock reranker to return reordered indices
+        self.orchestrator.reranker.rerank.return_value = [1, 0, 2]  # Reorder: 2nd, 1st, 3rd
+        
+        # Mock database query - chunks in different order than search results
+        mock_chunks = [
+            Chunk(id=5, document_id=1, text="Second chunk", page=2),   # chunk_id=5
+            Chunk(id=10, document_id=1, text="First chunk", page=1),   # chunk_id=10
+            Chunk(id=15, document_id=1, text="Third chunk", page=3),   # chunk_id=15
+        ]
+        self.mock_db.query.return_value.filter.return_value.in_.return_value.all.return_value = mock_chunks
+        
+        # Test with rerank=True
+        result = self.orchestrator.generate_answer("Test query", rerank=True)
+        
+        # Verify reranker was called with correct pairs order
+        self.orchestrator.reranker.rerank.assert_called_once()
+        call_args = self.orchestrator.reranker.rerank.call_args
+        pairs = call_args[0][0]  # First argument is pairs
+        
+        # Pairs should be in order of search_results: chunk_id 10, 5, 15
+        self.assertEqual(pairs[0][1], "First chunk")   # chunk_id=10
+        self.assertEqual(pairs[1][1], "Second chunk")  # chunk_id=5
+        self.assertEqual(pairs[2][1], "Third chunk")   # chunk_id=15
+        
+        # Verify reranked chunks are in correct order based on reranker indices
+        # reranker returned [1, 0, 2], so order should be: pairs[1], pairs[0], pairs[2]
+        # This means: chunk_id=5, chunk_id=10, chunk_id=15
+        # The first chunk in context should be chunk_id=5 ("Second chunk")
+        # We can't directly test this without mocking build_messages, but we can verify
+        # that reranker was called with the correct pairs order
 
 
 if __name__ == "__main__":

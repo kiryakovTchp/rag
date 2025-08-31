@@ -118,6 +118,7 @@ async def stream_answer(
         headers={
             "Cache-Control": "no-cache",
             "Connection": "keep-alive",
+            "X-Accel-Buffering": "no",  # Disable nginx buffering
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Headers": "*",
         }

@@ -142,6 +142,9 @@ ANSWER_CACHE_TTL=300                    # TTL кэша ответов (сек)
 
 # Content Filter (опционально)
 ANSWER_CONTENT_FILTER=false             # Включить фильтр контента
+
+# Frontend CORS
+FRONTEND_ORIGINS=http://localhost:3000  # Разрешённые домены для CORS (через запятую)
 ```
 
 #### Примеры использования
@@ -306,6 +309,33 @@ curl -X POST http://localhost:8000/answer/stream \
 # event: done
 # data: {"citations": [...], "usage": {...}}
 ```
+
+## CORS и SSE
+
+### Настройка CORS
+Система поддерживает CORS для фронтенда. Настройте `FRONTEND_ORIGINS` в `.env`:
+
+```bash
+# Для одного домена
+FRONTEND_ORIGINS=http://localhost:3000
+
+# Для нескольких доменов
+FRONTEND_ORIGINS=http://localhost:3000,https://yourdomain.com
+```
+
+### Server-Sent Events (SSE)
+Эндпоинт `/answer/stream` использует SSE для потоковой передачи ответов.
+
+**Важно для продакшена:**
+- Отключите буферизацию в nginx: `proxy_buffering off;`
+- Или используйте заголовок `X-Accel-Buffering: no` (уже добавлен)
+
+### Требования для LLM
+Для работы `/answer` и `/answer/stream` требуется:
+- `GEMINI_API_KEY` - API ключ Google AI Studio
+- `LLM_PROVIDER=gemini` - провайдер LLM
+
+**⚠️ Безопасность:** API ключ хранится только в `.env` и не коммитится в репозиторий.
 ```
 
 ## Разработка

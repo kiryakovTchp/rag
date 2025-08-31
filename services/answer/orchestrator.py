@@ -81,12 +81,15 @@ class AnswerOrchestrator:
         
         # Apply reranking if requested
         if rerank and len(chunks) > 1:
+            # Get ordered chunk IDs from search results
+            ordered_chunk_ids = [chunk_id for chunk_id, _ in search_results]
+            
             # Prepare pairs for reranking
-            pairs = [(query, chunk_map[chunk_id].text) for chunk_id, _ in search_results]
+            pairs = [(query, chunk_map[chunk_id].text) for chunk_id in ordered_chunk_ids]
             reranked_indices = self.reranker.rerank(pairs, top_k=len(pairs))
             
-            # Reorder chunks based on reranking
-            reranked_chunks = [chunks[i] for i in reranked_indices if i < len(chunks)]
+            # Reorder chunks based on reranking using chunk IDs
+            reranked_chunks = [chunk_map[ordered_chunk_ids[i]] for i in reranked_indices if i < len(ordered_chunk_ids)]
         else:
             reranked_chunks = chunks
         
@@ -186,9 +189,15 @@ class AnswerOrchestrator:
         
         # Apply reranking if requested
         if rerank and len(chunks) > 1:
-            pairs = [(query, chunk_map[chunk_id].text) for chunk_id, _ in search_results]
+            # Get ordered chunk IDs from search results
+            ordered_chunk_ids = [chunk_id for chunk_id, _ in search_results]
+            
+            # Prepare pairs for reranking
+            pairs = [(query, chunk_map[chunk_id].text) for chunk_id in ordered_chunk_ids]
             reranked_indices = self.reranker.rerank(pairs, top_k=len(pairs))
-            reranked_chunks = [chunks[i] for i in reranked_indices if i < len(chunks)]
+            
+            # Reorder chunks based on reranking using chunk IDs
+            reranked_chunks = [chunk_map[ordered_chunk_ids[i]] for i in reranked_indices if i < len(ordered_chunk_ids)]
         else:
             reranked_chunks = chunks
         

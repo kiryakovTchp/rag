@@ -74,7 +74,6 @@ class GeminiProvider(LLMProvider):
             contents = self._prepare_messages(messages)
             
             # Run in thread pool with timeout
-            loop = asyncio.new_event_loop()
             future = self.executor.submit(
                 self._generate_sync,
                 contents, model, max_tokens, temperature

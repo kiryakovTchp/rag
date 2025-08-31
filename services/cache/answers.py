@@ -107,7 +107,8 @@ class AnswerCache:
         cache_data = {
             "answer": answer,
             "citations": citations,
-            "usage": usage
+            "usage": usage,
+            "tenant_id": tenant_id
         }
         
         try:

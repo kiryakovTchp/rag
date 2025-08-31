@@ -3,9 +3,7 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 from fastapi import FastAPI
-
-from dotenv import load_dotenv
-from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from api.routers.health import router as health_router
 from api.routers.ingest import router as ingest_router
@@ -17,6 +15,16 @@ env_path = Path(__file__).parent.parent / ".env"
 load_dotenv(env_path)
 
 app = FastAPI(title="PromoAI RAG API")
+
+# Configure CORS
+frontend_origins = os.getenv("FRONTEND_ORIGINS", "http://localhost:3000").split(",")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=frontend_origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(health_router, prefix="")
 app.include_router(ingest_router, prefix="")
