@@ -10,8 +10,8 @@ from api.routers.ingest import router as ingest_router
 from api.routers.query import router as query_router
 from api.routers.answer import router as answer_router
 from api.routers.websocket import router as websocket_router
+from api.routers.auth import router as auth_router
 from api.routers.feedback import router as feedback_router
-from api.websocket import router as websocket_router
 from api.metrics import metrics_endpoint
 
 # Load environment variables from .env file
@@ -35,6 +35,7 @@ app.include_router(ingest_router, prefix="")
 app.include_router(query_router, prefix="")
 app.include_router(answer_router, prefix="")
 app.include_router(websocket_router, prefix="")
+app.include_router(auth_router, prefix="")
 app.include_router(feedback_router, prefix="")
 app.include_router(websocket_router, prefix="")
 

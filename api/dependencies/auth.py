@@ -92,13 +92,52 @@ async def get_current_user_api_key(credentials: HTTPAuthorizationCredentials = D
         db.close()
 
 
+async def get_current_user_api_key_header(request: Request) -> Optional[User]:
+    """Get current user from X-API-Key header."""
+    api_key = request.headers.get("X-API-Key")
+    if not api_key:
+        return None
+    
+    # Get database session
+    db = next(get_db())
+    
+    try:
+        # Find API key in database
+        db_api_key = db.query(APIKey).filter(
+            APIKey.key_hash == APIKey.hash_key(api_key),
+            APIKey.revoked_at.is_(None)
+        ).first()
+        
+        if not db_api_key:
+            return None
+        
+        # Create user object
+        user = User(
+            id=f"api_{db_api_key.id}",
+            tenant_id=db_api_key.tenant_id,
+            email="",
+            role=db_api_key.role
+        )
+        return user
+        
+    except Exception:
+        return None
+    finally:
+        db.close()
+
+
 async def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security)
 ) -> User:
     """Get current user from JWT token or API key."""
-    # Try API key first
+    # Try API key from Bearer token first
     user = await get_current_user_api_key(credentials)
+    if user:
+        return user
+    
+    # Try API key from X-API-Key header
+    user = await get_current_user_api_key_header(request)
     if user:
         return user
     

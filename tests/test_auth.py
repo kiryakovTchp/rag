@@ -1,116 +1,304 @@
 """Test authentication functionality."""
 
-import unittest
+import pytest
 import jwt
-import hashlib
+from datetime import datetime, timedelta
 from unittest.mock import Mock, patch
-from fastapi import HTTPException
-from datetime import datetime
+from fastapi.testclient import TestClient
 
-from api.auth import validate_jwt_token, validate_api_key, require_auth
-from db.models import APIKey
+from api.main import app
+from db.models import User, APIKey
+from api.dependencies.auth import get_current_user, get_current_user_api_key
+
+client = TestClient(app)
 
 
-class TestAuth(unittest.TestCase):
-    """Test authentication functions."""
+class TestAuthentication:
+    """Test authentication functionality."""
     
-    def setUp(self):
+    def setup_method(self):
         """Set up test fixtures."""
-        self.mock_db = Mock()
-    
-    @patch.dict('os.environ', {'NEXTAUTH_SECRET': 'test_secret'})
-    def test_validate_jwt_token_valid(self):
-        """Test valid JWT token validation."""
-        # Create a valid JWT token
-        payload = {
+        self.secret = "test_secret_key"
+        self.valid_payload = {
+            "sub": "test_user_123",
             "tenant_id": "test_tenant",
-            "user_id": "test_user",
-            "role": "user"
+            "email": "test@example.com",
+            "role": "user",
+            "iat": datetime.utcnow().timestamp(),
+            "exp": (datetime.utcnow() + timedelta(hours=1)).timestamp()
         }
-        token = jwt.encode(payload, "test_secret", algorithm="HS256")
-        
-        result = validate_jwt_token(token)
-        
-        self.assertIsNotNone(result)
-        self.assertEqual(result["tenant_id"], "test_tenant")
-        self.assertEqual(result["user_id"], "test_user")
-        self.assertEqual(result["role"], "user")
     
-    @patch.dict('os.environ', {'NEXTAUTH_SECRET': 'test_secret'})
-    def test_validate_jwt_token_invalid(self):
-        """Test invalid JWT token validation."""
-        # Invalid token
-        result = validate_jwt_token("invalid_token")
-        self.assertIsNone(result)
-        
-        # Token with wrong secret
-        payload = {"tenant_id": "test_tenant"}
-        token = jwt.encode(payload, "wrong_secret", algorithm="HS256")
-        result = validate_jwt_token(token)
-        self.assertIsNone(result)
+    def test_jwt_authentication_success(self):
+        """Test successful JWT authentication."""
+        with patch.dict('os.environ', {'NEXTAUTH_SECRET': self.secret}):
+            token = jwt.encode(self.valid_payload, self.secret, algorithm="HS256")
+            
+            with patch('api.dependencies.auth.get_current_user') as mock_auth:
+                mock_user = User(
+                    id="test_user_123",
+                    tenant_id="test_tenant",
+                    email="test@example.com",
+                    role="user"
+                )
+                mock_auth.return_value = mock_user
+                
+                response = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+                assert response.status_code == 200
     
-    @patch.dict('os.environ', {})
-    def test_validate_jwt_token_no_secret(self):
-        """Test JWT validation without secret."""
-        result = validate_jwt_token("any_token")
-        self.assertIsNone(result)
+    def test_jwt_authentication_invalid_token(self):
+        """Test JWT authentication with invalid token."""
+        with patch.dict('os.environ', {'NEXTAUTH_SECRET': self.secret}):
+            response = client.get("/me", headers={"Authorization": "Bearer invalid_token"})
+            assert response.status_code == 401
     
-    def test_validate_api_key_valid(self):
-        """Test valid API key validation."""
-        # Create mock API key
-        api_key = "pk_test_key_123"
-        key_hash = hashlib.sha256(api_key.encode()).hexdigest()
-        
-        mock_db_key = Mock()
-        mock_db_key.tenant_id = "test_tenant"
-        mock_db_key.role = "user"
-        mock_db_key.id = 1
-        
-        self.mock_db.query.return_value.filter.return_value.first.return_value = mock_db_key
-        
-        result = validate_api_key(api_key, self.mock_db)
-        
-        self.assertIsNotNone(result)
-        self.assertEqual(result["tenant_id"], "test_tenant")
-        self.assertEqual(result["user_id"], "api_key_1")
-        self.assertEqual(result["role"], "user")
+    def test_jwt_authentication_no_token(self):
+        """Test JWT authentication without token."""
+        response = client.get("/me")
+        assert response.status_code == 401
     
-    def test_validate_api_key_invalid(self):
-        """Test invalid API key validation."""
-        # Non-existent key
-        self.mock_db.query.return_value.filter.return_value.first.return_value = None
-        
-        result = validate_api_key("invalid_key", self.mock_db)
-        self.assertIsNone(result)
+    def test_api_key_authentication_success(self):
+        """Test successful API key authentication."""
+        with patch('api.dependencies.auth.get_current_user_api_key') as mock_auth:
+            mock_user = User(
+                id="api_123",
+                tenant_id="test_tenant",
+                email="",
+                role="user"
+            )
+            mock_auth.return_value = mock_user
+            
+            response = client.get("/me", headers={"Authorization": "Bearer pk_test_key"})
+            assert response.status_code == 200
     
-    def test_validate_api_key_revoked(self):
-        """Test revoked API key validation."""
-        # Create mock revoked API key
-        api_key = "pk_test_key_123"
-        
-        mock_db_key = Mock()
-        mock_db_key.revoked_at = datetime.utcnow()  # Revoked
-        
-        self.mock_db.query.return_value.filter.return_value.first.return_value = mock_db_key
-        
-        result = validate_api_key(api_key, self.mock_db)
-        self.assertIsNone(result)
+    def test_api_key_header_authentication_success(self):
+        """Test successful API key authentication via X-API-Key header."""
+        with patch('api.dependencies.auth.get_current_user_api_key_header') as mock_auth:
+            mock_user = User(
+                id="api_123",
+                tenant_id="test_tenant",
+                email="",
+                role="user"
+            )
+            mock_auth.return_value = mock_user
+            
+            response = client.get("/me", headers={"X-API-Key": "pk_test_key"})
+            assert response.status_code == 200
     
-    @patch.dict('os.environ', {'REQUIRE_AUTH': 'true'})
-    def test_require_auth_true(self):
-        """Test require_auth when enabled."""
-        self.assertTrue(require_auth())
+    def test_api_key_authentication_invalid_key(self):
+        """Test API key authentication with invalid key."""
+        with patch('api.dependencies.auth.get_current_user_api_key') as mock_auth:
+            mock_auth.return_value = None
+            
+            response = client.get("/me", headers={"Authorization": "Bearer pk_invalid_key"})
+            assert response.status_code == 401
     
-    @patch.dict('os.environ', {'REQUIRE_AUTH': 'false'})
-    def test_require_auth_false(self):
-        """Test require_auth when disabled."""
-        self.assertFalse(require_auth())
+    def test_authentication_priority(self):
+        """Test authentication priority (API key over JWT)."""
+        with patch('api.dependencies.auth.get_current_user_api_key') as mock_api_key, \
+             patch('api.dependencies.auth.get_current_user_api_key_header') as mock_api_header, \
+             patch('api.dependencies.auth.get_current_user') as mock_jwt:
+            
+            # API key should be tried first
+            mock_user = User(id="api_123", tenant_id="test_tenant", email="", role="user")
+            mock_api_key.return_value = mock_user
+            mock_api_header.return_value = None
+            
+            token = jwt.encode(self.valid_payload, self.secret, algorithm="HS256")
+            response = client.get("/me", headers={"Authorization": f"Bearer {token}"})
+            
+            # Should use API key, not JWT
+            mock_api_key.assert_called_once()
+            mock_jwt.assert_not_called()
+
+
+class TestAPIKeyManagement:
+    """Test API key management endpoints."""
     
-    @patch.dict('os.environ', {})
-    def test_require_auth_default(self):
-        """Test require_auth default value."""
-        self.assertFalse(require_auth())
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.secret = "test_secret_key"
+        self.valid_payload = {
+            "sub": "test_user_123",
+            "tenant_id": "test_tenant",
+            "email": "test@example.com",
+            "role": "user",
+            "iat": datetime.utcnow().timestamp(),
+            "exp": (datetime.utcnow() + timedelta(hours=1)).timestamp()
+        }
+    
+    @patch('api.routers.auth.get_current_user')
+    @patch('api.routers.auth.get_db')
+    def test_create_api_key_success(self, mock_db, mock_auth):
+        """Test successful API key creation."""
+        # Mock user
+        mock_user = User(
+            id="test_user_123",
+            tenant_id="test_tenant",
+            email="test@example.com",
+            role="user"
+        )
+        mock_auth.return_value = mock_user
+        
+        # Mock database
+        mock_session = Mock()
+        mock_db.return_value = mock_session
+        
+        token = jwt.encode(self.valid_payload, self.secret, algorithm="HS256")
+        
+        response = client.post(
+            "/api-keys",
+            headers={"Authorization": f"Bearer {token}"},
+            json={"role": "user"}
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert "key" in data
+        assert data["tenant_id"] == "test_tenant"
+        assert data["role"] == "user"
+    
+    @patch('api.routers.auth.get_current_user')
+    @patch('api.routers.auth.get_db')
+    def test_list_api_keys_success(self, mock_db, mock_auth):
+        """Test successful API key listing."""
+        # Mock user
+        mock_user = User(
+            id="test_user_123",
+            tenant_id="test_tenant",
+            email="test@example.com",
+            role="user"
+        )
+        mock_auth.return_value = mock_user
+        
+        # Mock database
+        mock_session = Mock()
+        mock_query = Mock()
+        mock_filter = Mock()
+        mock_session.query.return_value = mock_query
+        mock_query.filter.return_value = mock_filter
+        mock_filter.all.return_value = []
+        mock_db.return_value = mock_session
+        
+        token = jwt.encode(self.valid_payload, self.secret, algorithm="HS256")
+        
+        response = client.get(
+            "/api-keys",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 200
+        assert response.json() == []
+    
+    @patch('api.routers.auth.get_current_user')
+    @patch('api.routers.auth.get_db')
+    def test_revoke_api_key_success(self, mock_db, mock_auth):
+        """Test successful API key revocation."""
+        # Mock user
+        mock_user = User(
+            id="test_user_123",
+            tenant_id="test_tenant",
+            email="test@example.com",
+            role="user"
+        )
+        mock_auth.return_value = mock_user
+        
+        # Mock database
+        mock_session = Mock()
+        mock_query = Mock()
+        mock_filter = Mock()
+        mock_api_key = Mock()
+        mock_api_key.revoked_at = None
+        
+        mock_session.query.return_value = mock_query
+        mock_query.filter.return_value = mock_filter
+        mock_filter.first.return_value = mock_api_key
+        mock_db.return_value = mock_session
+        
+        token = jwt.encode(self.valid_payload, self.secret, algorithm="HS256")
+        
+        response = client.delete(
+            "/api-keys/123",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 200
+        assert response.json()["message"] == "API key revoked successfully"
+    
+    @patch('api.routers.auth.get_current_user')
+    @patch('api.routers.auth.get_db')
+    def test_revoke_api_key_not_found(self, mock_db, mock_auth):
+        """Test API key revocation when key not found."""
+        # Mock user
+        mock_user = User(
+            id="test_user_123",
+            tenant_id="test_tenant",
+            email="test@example.com",
+            role="user"
+        )
+        mock_auth.return_value = mock_user
+        
+        # Mock database
+        mock_session = Mock()
+        mock_query = Mock()
+        mock_filter = Mock()
+        
+        mock_session.query.return_value = mock_query
+        mock_query.filter.return_value = mock_filter
+        mock_filter.first.return_value = None
+        mock_db.return_value = mock_session
+        
+        token = jwt.encode(self.valid_payload, self.secret, algorithm="HS256")
+        
+        response = client.delete(
+            "/api-keys/999",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 404
+        assert response.json()["detail"] == "API key not found"
+
+
+class TestUserInfo:
+    """Test user information endpoints."""
+    
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.secret = "test_secret_key"
+        self.valid_payload = {
+            "sub": "test_user_123",
+            "tenant_id": "test_tenant",
+            "email": "test@example.com",
+            "role": "user",
+            "iat": datetime.utcnow().timestamp(),
+            "exp": (datetime.utcnow() + timedelta(hours=1)).timestamp()
+        }
+    
+    @patch('api.routers.auth.get_current_user')
+    def test_get_current_user_info(self, mock_auth):
+        """Test getting current user information."""
+        # Mock user
+        mock_user = User(
+            id="test_user_123",
+            tenant_id="test_tenant",
+            email="test@example.com",
+            role="user"
+        )
+        mock_auth.return_value = mock_user
+        
+        token = jwt.encode(self.valid_payload, self.secret, algorithm="HS256")
+        
+        response = client.get(
+            "/me",
+            headers={"Authorization": f"Bearer {token}"}
+        )
+        
+        assert response.status_code == 200
+        data = response.json()
+        assert data["id"] == "test_user_123"
+        assert data["email"] == "test@example.com"
+        assert data["tenant_id"] == "test_tenant"
+        assert data["role"] == "user"
 
 
 if __name__ == "__main__":
-    unittest.main()
+    pytest.main([__file__])
