@@ -14,26 +14,36 @@ class TestAnswerOrchestrator(unittest.TestCase):
     def setUp(self):
         """Set up test fixtures."""
         self.mock_db = Mock(spec=Session)
-        self.orchestrator = AnswerOrchestrator(self.mock_db)
+        
+        # Mock all dependencies to avoid external connections
+        with patch('services.answer.orchestrator.PGVectorIndex') as mock_index_class, \
+             patch('services.answer.orchestrator.get_llm_provider') as mock_get_llm, \
+             patch('services.answer.orchestrator.EmbeddingProvider') as mock_embedder_class, \
+             patch('services.answer.orchestrator.WorkersAIReranker') as mock_reranker_class, \
+             patch('services.answer.orchestrator.AnswerCache') as mock_cache_class:
+            
+            self.mock_index = Mock()
+            self.mock_llm = Mock()
+            self.mock_embedder = Mock()
+            self.mock_reranker = Mock()
+            self.mock_cache = Mock()
+            
+            mock_index_class.return_value = self.mock_index
+            mock_get_llm.return_value = self.mock_llm
+            mock_embedder_class.return_value = self.mock_embedder
+            mock_reranker_class.return_value = self.mock_reranker
+            mock_cache_class.return_value = self.mock_cache
+            
+            self.orchestrator = AnswerOrchestrator(self.mock_db)
     
-    @patch('services.answer.orchestrator.EmbeddingProvider')
-    @patch('services.answer.orchestrator.PGVectorIndex')
-    @patch('services.answer.orchestrator.get_llm_provider')
-    def test_generate_answer_success(self, mock_get_llm, mock_index, mock_embedder):
+    def test_generate_answer_success(self):
         """Test successful answer generation."""
         # Mock dependencies
-        mock_llm = Mock()
-        mock_llm.generate.return_value = ("Test answer", {"provider": "gemini", "model": "test"})
+        self.mock_llm.generate.return_value = ("Test answer", {"provider": "gemini", "model": "test"})
         
-        mock_get_llm.return_value = mock_llm
+        self.mock_embedder.embed_single.return_value = [0.1] * 1024
         
-        mock_embedder_instance = Mock()
-        mock_embedder_instance.embed_single.return_value = [0.1] * 1024
-        mock_embedder.return_value = mock_embedder_instance
-        
-        mock_index_instance = Mock()
-        mock_index_instance.search.return_value = [(1, 0.8), (2, 0.7)]
-        mock_index.return_value = mock_index_instance
+        self.mock_index.search.return_value = [(1, 0.8), (2, 0.7)]
         
         # Mock database query
         mock_chunks = [
@@ -51,22 +61,16 @@ class TestAnswerOrchestrator(unittest.TestCase):
         self.assertEqual(result["usage"]["provider"], "gemini")
         
         # Verify LLM was called
-        mock_llm.generate.assert_called_once()
-        call_args = mock_llm.generate.call_args
+        self.mock_llm.generate.assert_called_once()
+        call_args = self.mock_llm.generate.call_args
         self.assertEqual(call_args[1]["model"], "gemini-2.5-flash")
     
-    @patch('services.answer.orchestrator.EmbeddingProvider')
-    @patch('services.answer.orchestrator.PGVectorIndex')
-    def test_generate_answer_no_context(self, mock_index, mock_embedder):
+    def test_generate_answer_no_context(self):
         """Test answer generation with no relevant context."""
         # Mock dependencies
-        mock_embedder_instance = Mock()
-        mock_embedder_instance.embed_single.return_value = [0.1] * 1024
-        mock_embedder.return_value = mock_embedder_instance
+        self.mock_embedder.embed_single.return_value = [0.1] * 1024
         
-        mock_index_instance = Mock()
-        mock_index_instance.search.return_value = []  # No results
-        mock_index.return_value = mock_index_instance
+        self.mock_index.search.return_value = []  # No results
         
         # Test
         with self.assertRaises(Exception) as cm:
@@ -74,23 +78,14 @@ class TestAnswerOrchestrator(unittest.TestCase):
         
         self.assertIn("No relevant context found", str(cm.exception))
     
-    @patch('services.answer.orchestrator.EmbeddingProvider')
-    @patch('services.answer.orchestrator.PGVectorIndex')
-    @patch('services.answer.orchestrator.get_llm_provider')
-    def test_generate_answer_with_rerank(self, mock_get_llm, mock_index, mock_embedder):
+    def test_generate_answer_with_rerank(self):
         """Test answer generation with reranking enabled."""
         # Mock dependencies
-        mock_llm = Mock()
-        mock_llm.generate.return_value = ("Test answer", {"provider": "gemini", "model": "test"})
-        mock_get_llm.return_value = mock_llm
+        self.mock_llm.generate.return_value = ("Test answer", {"provider": "gemini", "model": "test"})
         
-        mock_embedder_instance = Mock()
-        mock_embedder_instance.embed_single.return_value = [0.1] * 1024
-        mock_embedder.return_value = mock_embedder_instance
+        self.mock_embedder.embed_single.return_value = [0.1] * 1024
         
-        mock_index_instance = Mock()
-        mock_index_instance.search.return_value = [(1, 0.8), (2, 0.7)]
-        mock_index.return_value = mock_index_instance
+        self.mock_index.search.return_value = [(1, 0.8), (2, 0.7)]
         
         # Mock reranker
         self.orchestrator.reranker.rerank.return_value = [1, 0]  # Reorder chunks
@@ -112,23 +107,14 @@ class TestAnswerOrchestrator(unittest.TestCase):
         self.assertEqual(result["answer"], "Test answer")
         self.assertEqual(len(result["citations"]), 2)
     
-    @patch('services.answer.orchestrator.EmbeddingProvider')
-    @patch('services.answer.orchestrator.PGVectorIndex')
-    @patch('services.answer.orchestrator.get_llm_provider')
-    def test_stream_answer(self, mock_get_llm, mock_index, mock_embedder):
+    def test_stream_answer(self):
         """Test streaming answer generation."""
         # Mock dependencies
-        mock_llm = Mock()
-        mock_llm.stream.return_value = ["Hello", " world", "!"]
-        mock_get_llm.return_value = mock_llm
+        self.mock_llm.stream.return_value = ["Hello", " world", "!"]
         
-        mock_embedder_instance = Mock()
-        mock_embedder_instance.embed_single.return_value = [0.1] * 1024
-        mock_embedder.return_value = mock_embedder_instance
+        self.mock_embedder.embed_single.return_value = [0.1] * 1024
         
-        mock_index_instance = Mock()
-        mock_index_instance.search.return_value = [(1, 0.8)]
-        mock_index.return_value = mock_index_instance
+        self.mock_index.search.return_value = [(1, 0.8)]
         
         # Mock database query
         mock_chunks = [Chunk(id=1, document_id=1, text="Test chunk", page=1)]
@@ -153,23 +139,14 @@ class TestAnswerOrchestrator(unittest.TestCase):
         self.assertIn("citations", done_chunk)
         self.assertIn("usage", done_chunk)
     
-    @patch('services.answer.orchestrator.EmbeddingProvider')
-    @patch('services.answer.orchestrator.PGVectorIndex')
-    @patch('services.answer.orchestrator.get_llm_provider')
-    def test_generate_answer_with_tenant_logging(self, mock_get_llm, mock_index, mock_embedder):
+    def test_generate_answer_with_tenant_logging(self):
         """Test answer generation with tenant logging."""
         # Mock dependencies
-        mock_llm = Mock()
-        mock_llm.generate.return_value = ("Test answer", {"provider": "gemini", "model": "test"})
-        mock_get_llm.return_value = mock_llm
+        self.mock_llm.generate.return_value = ("Test answer", {"provider": "gemini", "model": "test"})
         
-        mock_embedder_instance = Mock()
-        mock_embedder_instance.embed_single.return_value = [0.1] * 1024
-        mock_embedder.return_value = mock_embedder_instance
+        self.mock_embedder.embed_single.return_value = [0.1] * 1024
         
-        mock_index_instance = Mock()
-        mock_index_instance.search.return_value = [(1, 0.8)]
-        mock_index.return_value = mock_index_instance
+        self.mock_index.search.return_value = [(1, 0.8)]
         
         # Mock database query
         mock_chunks = [Chunk(id=1, document_id=1, text="Test chunk", page=1)]
@@ -185,24 +162,15 @@ class TestAnswerOrchestrator(unittest.TestCase):
         self.assertEqual(call_args[1]["tenant_id"], "test_tenant")
         self.assertEqual(call_args[1]["query"], "Test query")
 
-    @patch('services.answer.orchestrator.EmbeddingProvider')
-    @patch('services.answer.orchestrator.PGVectorIndex')
-    @patch('services.answer.orchestrator.get_llm_provider')
-    def test_rerank_order_by_chunk_id(self, mock_get_llm, mock_index, mock_embedder):
+    def test_rerank_order_by_chunk_id(self):
         """Test that reranking preserves order by chunk_id, not list position."""
         # Mock dependencies
-        mock_llm = Mock()
-        mock_llm.generate.return_value = ("Test answer", {"provider": "gemini", "model": "test"})
-        mock_get_llm.return_value = mock_llm
+        self.mock_llm.generate.return_value = ("Test answer", {"provider": "gemini", "model": "test"})
         
-        mock_embedder_instance = Mock()
-        mock_embedder_instance.embed_single.return_value = [0.1] * 1024
-        mock_embedder.return_value = mock_embedder_instance
+        self.mock_embedder.embed_single.return_value = [0.1] * 1024
         
         # Mock search results with specific chunk IDs
-        mock_index_instance = Mock()
-        mock_index_instance.search.return_value = [(10, 0.8), (5, 0.9), (15, 0.7)]  # chunk_id, score
-        mock_index.return_value = mock_index_instance
+        self.mock_index.search.return_value = [(10, 0.8), (5, 0.9), (15, 0.7)]  # chunk_id, score
         
         # Mock reranker to return reordered indices
         self.orchestrator.reranker.rerank.return_value = [1, 0, 2]  # Reorder: 2nd, 1st, 3rd
@@ -213,7 +181,21 @@ class TestAnswerOrchestrator(unittest.TestCase):
             Chunk(id=10, document_id=1, text="First chunk", page=1),   # chunk_id=10
             Chunk(id=15, document_id=1, text="Third chunk", page=3),   # chunk_id=15
         ]
-        self.mock_db.query.return_value.filter.return_value.in_.return_value.all.return_value = mock_chunks
+        
+        # Mock the entire query chain
+        mock_query = Mock()
+        mock_filter = Mock()
+        mock_in = Mock()
+        mock_all = Mock()
+        
+        mock_query.filter.return_value = mock_filter
+        mock_filter.in_.return_value = mock_in
+        mock_in.all.return_value = mock_chunks
+        
+        self.mock_db.query.return_value = mock_query
+        
+        # Mock cache to return None (no cache hit)
+        self.mock_cache.get.return_value = None
         
         # Test with rerank=True
         result = self.orchestrator.generate_answer("Test query", rerank=True)

@@ -1,6 +1,7 @@
 """Test answer caching functionality."""
 
 import unittest
+import redis
 from unittest.mock import Mock, patch
 from services.cache.answers import AnswerCache
 
@@ -108,13 +109,16 @@ class TestAnswerCache(unittest.TestCase):
     def test_cache_redis_error_handling(self):
         """Test that Redis errors are handled gracefully."""
         # Test get with Redis error
-        self.mock_redis.get.side_effect = Exception("Redis error")
+        self.mock_redis.get.side_effect = redis.RedisError("Redis error")
         
         result = self.cache.get("tenant1", "query", 10, False, 2000, "model1")
         self.assertIsNone(result)
         
+        # Reset side effect
+        self.mock_redis.get.side_effect = None
+        
         # Test set with Redis error
-        self.mock_redis.setex.side_effect = Exception("Redis error")
+        self.mock_redis.setex.side_effect = redis.RedisError("Redis error")
         
         # Should not raise exception
         try:

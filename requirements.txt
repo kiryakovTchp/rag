@@ -29,3 +29,5 @@ commitizen==3.13.0
 sentence-transformers==2.2.2
 numpy==1.24.3
 psycopg2-binary==2.9.7
+pgvector==0.2.4
+google-genai==0.3.2
