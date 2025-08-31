@@ -4,6 +4,8 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from api.deps import get_db
+from api.auth import get_current_user
+from api.middleware.rate_limit import check_rate_limit
 from api.schemas.ingest import IngestResponse, JobStatusResponse, DocumentStatusResponse
 from services.ingest.service import IngestService
 
@@ -19,8 +21,19 @@ async def ingest_document(
     tenant_id: Optional[str] = Form(None),
     safe_mode: bool = Form(False),
     db: Session = _GET_DB,
+    user: dict = Depends(get_current_user),
 ) -> IngestResponse:
     """Upload and ingest a document."""
+    # Get user info
+    user_tenant_id = user.get("tenant_id")
+    user_id = user.get("user_id")
+    
+    # Use user's tenant_id if not provided
+    if not tenant_id:
+        tenant_id = user_tenant_id
+    
+    # Check rate limit
+    await check_rate_limit(None, user_id)
     # Validate file type
     allowed_types = [
         "application/pdf",

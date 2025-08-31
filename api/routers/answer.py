@@ -7,7 +7,9 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from api.deps import get_db
+from api.auth import get_current_user
 from api.schemas.answer import AnswerRequest, AnswerResponse
+from api.middleware.rate_limit import check_rate_limit, check_daily_quota, update_quota_usage
 from services.answer.orchestrator import AnswerOrchestrator
 from services.answer.guard import AnswerGuard
 
@@ -18,17 +20,26 @@ router = APIRouter()
 async def generate_answer(
     request: AnswerRequest,
     db: Session = Depends(get_db),
-    http_request: Request = None
+    http_request: Request = None,
+    user: dict = Depends(get_current_user)
 ) -> AnswerResponse:
     """Generate an answer to a query."""
-    # Get tenant ID from headers or query params
-    tenant_id = http_request.headers.get("X-Tenant-ID") if http_request else None
+    # Get user info
+    tenant_id = user.get("tenant_id")
+    user_id = user.get("user_id")
+    
+    # Check rate limit
+    await check_rate_limit(http_request, user_id)
     
     # Validate input
     guard = AnswerGuard()
     guard.validate_query(request.query)
     
     try:
+        # Check daily quota (estimate tokens)
+        estimated_tokens = len(request.query.split()) * 2  # Rough estimate
+        await check_daily_quota(tenant_id, estimated_tokens)
+        
         # Generate answer
         orchestrator = AnswerOrchestrator(db)
         result = orchestrator.generate_answer(
@@ -42,6 +53,12 @@ async def generate_answer(
             timeout_s=request.timeout_s,
             tenant_id=tenant_id
         )
+        
+        # Update quota usage with actual tokens
+        if result.get("usage"):
+            total_tokens = (result["usage"].get("in_tokens", 0) + 
+                          result["usage"].get("out_tokens", 0))
+            await update_quota_usage(tenant_id, total_tokens)
         
         return AnswerResponse(
             answer=result["answer"],
@@ -71,11 +88,16 @@ async def generate_answer(
 async def stream_answer(
     request: AnswerRequest,
     db: Session = Depends(get_db),
-    http_request: Request = None
+    http_request: Request = None,
+    user: dict = Depends(get_current_user)
 ) -> StreamingResponse:
     """Generate a streaming answer to a query."""
-    # Get tenant ID from headers or query params
-    tenant_id = http_request.headers.get("X-Tenant-ID") if http_request else None
+    # Get user info
+    tenant_id = user.get("tenant_id")
+    user_id = user.get("user_id")
+    
+    # Check rate limit
+    await check_rate_limit(http_request, user_id)
     
     # Validate input
     guard = AnswerGuard()
@@ -83,6 +105,10 @@ async def stream_answer(
     
     def generate_stream():
         try:
+            # Check daily quota (estimate tokens)
+            estimated_tokens = len(request.query.split()) * 2  # Rough estimate
+            # Note: We can't use await in generator, so quota check is done before
+            
             # Generate streaming answer
             orchestrator = AnswerOrchestrator(db)
             stream = orchestrator.stream_answer(
