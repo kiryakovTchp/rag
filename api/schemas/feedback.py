@@ -1,12 +1,12 @@
-"""Feedback API schemas."""
+"""Feedback schemas."""
 
-from typing import List, Optional
-from pydantic import BaseModel
 from datetime import datetime
+from typing import Optional, List
+from pydantic import BaseModel
 
 
-class FeedbackRequest(BaseModel):
-    """Request schema for feedback submission."""
+class FeedbackCreate(BaseModel):
+    """Schema for creating feedback."""
     answer_id: str
     rating: str  # 'up' or 'down'
     reason: Optional[str] = None
@@ -14,12 +14,14 @@ class FeedbackRequest(BaseModel):
 
 
 class FeedbackResponse(BaseModel):
-    """Response schema for feedback submission."""
+    """Schema for feedback response."""
     id: int
     answer_id: str
+    tenant_id: str
+    user_id: Optional[str]
     rating: str
-    reason: Optional[str] = None
-    selected_citation_ids: Optional[List[int]] = None
+    reason: Optional[str]
+    selected_citation_ids: Optional[List[int]]
     created_at: datetime
 
     class Config:

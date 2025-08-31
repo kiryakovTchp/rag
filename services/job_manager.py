@@ -3,7 +3,7 @@
 import asyncio
 from datetime import datetime
 from typing import Optional
-from api.websocket import emit_job_event_sync
+from api.routers.websocket import emit_job_event
 
 
 class JobManager:
@@ -22,7 +22,7 @@ class JobManager:
             "progress": 0,
             "ts": datetime.utcnow().isoformat()
         }
-        emit_job_event_sync(tenant_id, event_data)
+        await emit_job_event(tenant_id, event_data)
     
     async def job_progress(self, job_id: int, progress: int, tenant_id: str = "", document_id: Optional[int] = None, job_type: Optional[str] = None):
         """Emit job progress event."""
@@ -34,7 +34,7 @@ class JobManager:
             "progress": progress,
             "ts": datetime.utcnow().isoformat()
         }
-        emit_job_event_sync(tenant_id, event_data)
+        await emit_job_event(tenant_id, event_data)
     
     async def job_done(self, job_id: int, tenant_id: str = "", document_id: Optional[int] = None, job_type: Optional[str] = None):
         """Emit job done event."""
@@ -46,7 +46,7 @@ class JobManager:
             "progress": 100,
             "ts": datetime.utcnow().isoformat()
         }
-        emit_job_event_sync(tenant_id, event_data)
+        await emit_job_event(tenant_id, event_data)
     
     async def job_failed(self, job_id: int, error: str, tenant_id: str = "", document_id: Optional[int] = None, job_type: Optional[str] = None):
         """Emit job failed event."""
@@ -59,7 +59,7 @@ class JobManager:
             "error": error,
             "ts": datetime.utcnow().isoformat()
         }
-        emit_job_event_sync(tenant_id, event_data)
+        await emit_job_event(tenant_id, event_data)
     
     async def heartbeat(self, job_id: int, tenant_id: str = "", document_id: Optional[int] = None, job_type: Optional[str] = None):
         """Emit heartbeat event."""
@@ -70,7 +70,7 @@ class JobManager:
             "type": job_type or "job",
             "ts": datetime.utcnow().isoformat()
         }
-        emit_job_event_sync(tenant_id, event_data)
+        await emit_job_event(tenant_id, event_data)
 
 
 # Global instance

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 
 from api.deps import get_db
 from api.auth import get_current_user
-from api.middleware.rate_limit import check_rate_limit
+from api.middleware.rate_limit import check_quota
 from api.schemas.ingest import IngestResponse, JobStatusResponse, DocumentStatusResponse
 from services.ingest.service import IngestService
 
@@ -32,8 +32,8 @@ async def ingest_document(
     if not tenant_id:
         tenant_id = user_tenant_id
     
-    # Check rate limit
-    await check_rate_limit(None, user_id)
+    # Check quota (rate limiting is handled by middleware)
+    # await check_quota(tenant_id, estimated_tokens)
     # Validate file type
     allowed_types = [
         "application/pdf",

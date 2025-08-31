@@ -19,3 +19,12 @@ except ImportError:
     raise ImportError("pgvector is required for vector operations")
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+
+def get_db():
+    """Get database session."""
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()

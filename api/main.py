@@ -41,7 +41,6 @@ app.include_router(answer_router, prefix="")
 app.include_router(websocket_router, prefix="")
 app.include_router(auth_router, prefix="")
 app.include_router(feedback_router, prefix="")
-app.include_router(websocket_router, prefix="")
 
 # Add metrics endpoint
 app.add_api_route("/metrics", metrics_endpoint, methods=["GET"])

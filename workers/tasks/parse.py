@@ -11,7 +11,7 @@ from services.parsing.pdf import PDFParser
 from services.parsing.tables import TableParser
 from storage.r2 import ObjectStore
 from workers.app import celery_app
-from api.websocket import emit_job_event_sync
+# from api.websocket import emit_job_event_sync  # Removed, using job_manager instead
 from services.job_manager import job_manager
 
 logger = logging.getLogger(__name__)
