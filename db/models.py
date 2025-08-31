@@ -88,3 +88,18 @@ class Embedding(Base):
 
     # Relationships
     chunk = relationship("Chunk", backref="embedding")
+
+
+class AnswerLog(Base):
+    __tablename__ = "answer_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(100), nullable=True)
+    query = Column(Text, nullable=False)
+    provider = Column(String(50), nullable=False)  # gemini, openai, etc.
+    model = Column(String(100), nullable=False)  # gemini-2.5-flash, etc.
+    in_tokens = Column(Integer, nullable=True)
+    out_tokens = Column(Integer, nullable=True)
+    latency_ms = Column(Integer, nullable=False)
+    cost_usd = Column(String(20), nullable=True)  # Decimal as string
+    created_at = Column(DateTime, default=func.now())

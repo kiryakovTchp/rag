@@ -128,6 +128,20 @@ IVFFLAT_PROBES=10                       # Количество проб для �
 # Admin API (опционально)
 ADMIN_API_ENABLED=false                 # Включить админ API
 ADMIN_API_TOKEN=your_admin_token        # Токен для админ API
+
+# LLM Provider
+LLM_PROVIDER=gemini                     # Провайдер LLM (gemini)
+LLM_MODEL=gemini-2.5-flash              # Модель LLM
+GEMINI_API_KEY=your_gemini_api_key      # API ключ для Google AI Studio
+LLM_TIMEOUT=30                          # Таймаут LLM запросов (сек)
+LLM_MAX_TOKENS=1024                     # Максимум токенов для генерации
+LLM_TEMPERATURE=0.2                     # Температура генерации (0.0-1.0)
+
+# Answer Cache
+ANSWER_CACHE_TTL=300                    # TTL кэша ответов (сек)
+
+# Content Filter (опционально)
+ANSWER_CONTENT_FILTER=false             # Включить фильтр контента
 ```
 
 #### Примеры использования
@@ -227,6 +241,70 @@ IVFFLAT_PROBES=5
 # Для больших индексов (>1M векторов)
 IVFFLAT_LISTS=1000
 IVFFLAT_PROBES=50
+```
+
+## Answer API
+
+### Generate Answer
+
+```bash
+# Синхронный ответ
+curl -X POST http://localhost:8000/answer \
+  -H "Content-Type: application/json" \
+  -H "X-Tenant-ID: your_tenant" \
+  -d '{
+    "query": "Что такое RAG?",
+    "top_k": 10,
+    "rerank": false,
+    "max_ctx": 2000,
+    "temperature": 0.2,
+    "max_tokens": 1024
+  }'
+
+# Пример ответа:
+{
+  "answer": "RAG (Retrieval-Augmented Generation) - это подход, который сочетает поиск информации с генерацией ответов...",
+  "citations": [
+    {
+      "doc_id": 1,
+      "chunk_id": 5,
+      "page": 2,
+      "score": 0.85
+    }
+  ],
+  "usage": {
+    "in_tokens": 150,
+    "out_tokens": 200,
+    "latency_ms": 1200,
+    "provider": "gemini",
+    "model": "gemini-2.5-flash",
+    "cost_usd": null
+  }
+}
+```
+
+### Streaming Answer
+
+```bash
+# Потоковый ответ (SSE)
+curl -X POST http://localhost:8000/answer/stream \
+  -H "Content-Type: application/json" \
+  -H "Accept: text/event-stream" \
+  -d '{
+    "query": "Как работает система?",
+    "top_k": 10,
+    "rerank": false
+  }'
+
+# Ответ приходит по частям:
+# event: chunk
+# data: {"text": "Система работает следующим образом..."}
+# 
+# event: chunk
+# data: {"text": "Она использует RAG для..."}
+# 
+# event: done
+# data: {"citations": [...], "usage": {...}}
 ```
 ```
 
