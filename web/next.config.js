@@ -3,13 +3,8 @@ const nextConfig = {
   experimental: {
     appDir: true,
   },
-  async rewrites() {
-    return [
-      {
-        source: '/api/proxy/:path*',
-        destination: `${process.env.API_BASE_URL || 'http://localhost:8000'}/:path*`,
-      },
-    ]
+  env: {
+    API_BASE_URL: process.env.API_BASE_URL || 'http://localhost:8000',
   },
 }
 
