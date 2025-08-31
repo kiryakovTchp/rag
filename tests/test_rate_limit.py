@@ -1,150 +1,253 @@
-"""Test rate limiting functionality."""
+"""Test rate limiting and quota functionality."""
 
-import unittest
+import pytest
 import time
 from unittest.mock import Mock, patch
-from fastapi import HTTPException
+from fastapi.testclient import TestClient
 
-from api.middleware.rate_limit import check_rate_limit, check_daily_quota, update_quota_usage
+from api.main import app
+from api.middleware.rate_limit import RateLimiter, QuotaLimiter, rate_limiter, quota_limiter
+
+client = TestClient(app)
 
 
-class TestRateLimit(unittest.TestCase):
-    """Test rate limiting functions."""
+class TestRateLimiter:
+    """Test rate limiting functionality."""
     
-    def setUp(self):
+    def setup_method(self):
         """Set up test fixtures."""
-        self.mock_request = Mock()
-        self.mock_request.headers = {}
+        self.rate_limiter = RateLimiter(requests_per_minute=5)
     
     @patch('api.middleware.rate_limit.redis_client')
-    @patch.dict('os.environ', {'RATE_LIMIT_PER_MIN': '5'})
-    def test_rate_limit_under_limit(self, mock_redis):
-        """Test rate limit when under the limit."""
-        # Mock Redis to return current count under limit
-        mock_redis.get.return_value = b"3"  # 3 requests so far
+    def test_rate_limit_allowed(self, mock_redis):
+        """Test that requests are allowed within limit."""
+        mock_redis.get.return_value = "2"  # 2 requests so far
+        mock_redis.pipeline.return_value.execute.return_value = [3, True]
         
-        # Should not raise exception
-        try:
-            check_rate_limit(self.mock_request, "test_user")
-        except HTTPException:
-            self.fail("Rate limit should not be exceeded")
-        
-        # Should increment counter
-        mock_redis.incr.assert_called_once()
-        mock_redis.expire.assert_called_once_with(mock_redis.incr.return_value, 60)
+        result = self.rate_limiter.is_allowed("test_user")
+        assert result is True
     
     @patch('api.middleware.rate_limit.redis_client')
-    @patch.dict('os.environ', {'RATE_LIMIT_PER_MIN': '5'})
     def test_rate_limit_exceeded(self, mock_redis):
-        """Test rate limit when exceeded."""
-        # Mock Redis to return current count at limit
-        mock_redis.get.return_value = b"5"  # 5 requests (at limit)
+        """Test that requests are blocked when limit exceeded."""
+        mock_redis.get.return_value = "5"  # Already at limit
         
-        # Should raise exception
-        with self.assertRaises(HTTPException) as context:
-            check_rate_limit(self.mock_request, "test_user")
-        
-        self.assertEqual(context.exception.status_code, 429)
-        self.assertIn("Rate limit exceeded", context.exception.detail)
+        result = self.rate_limiter.is_allowed("test_user")
+        assert result is False
     
     @patch('api.middleware.rate_limit.redis_client')
-    @patch.dict('os.environ', {'RATE_LIMIT_PER_MIN': '5'})
-    def test_rate_limit_first_request(self, mock_redis):
-        """Test rate limit on first request."""
-        # Mock Redis to return None (no previous requests)
-        mock_redis.get.return_value = None
+    def test_rate_limit_redis_error(self, mock_redis):
+        """Test that requests are allowed when Redis is down."""
+        mock_redis.get.side_effect = Exception("Redis error")
         
-        # Should not raise exception
-        try:
-            check_rate_limit(self.mock_request, "test_user")
-        except HTTPException:
-            self.fail("Rate limit should not be exceeded on first request")
-        
-        # Should increment counter
-        mock_redis.incr.assert_called_once()
+        result = self.rate_limiter.is_allowed("test_user")
+        assert result is True
     
     @patch('api.middleware.rate_limit.redis_client')
-    @patch.dict('os.environ', {'DAILY_TOKEN_QUOTA': '1000'})
-    def test_daily_quota_under_limit(self, mock_redis):
-        """Test daily quota when under the limit."""
-        # Mock Redis to return current usage under quota
-        mock_redis.get.return_value = b"500"  # 500 tokens used
+    def test_get_remaining(self, mock_redis):
+        """Test getting remaining requests."""
+        mock_redis.get.return_value = "3"  # 3 requests used
         
-        # Should not raise exception
-        try:
-            check_daily_quota("test_tenant", 400)  # 400 more tokens
-        except HTTPException:
-            self.fail("Daily quota should not be exceeded")
-        
-        # Should increment usage
-        mock_redis.incrby.assert_called_once()
-        mock_redis.expire.assert_called_once_with(mock_redis.incrby.return_value, 86400)
+        remaining = self.rate_limiter.get_remaining("test_user")
+        assert remaining == 2  # 5 - 3 = 2
+
+
+class TestQuotaLimiter:
+    """Test quota limiting functionality."""
+    
+    def setup_method(self):
+        """Set up test fixtures."""
+        self.quota_limiter = QuotaLimiter(daily_token_quota=1000)
     
     @patch('api.middleware.rate_limit.redis_client')
-    @patch.dict('os.environ', {'DAILY_TOKEN_QUOTA': '1000'})
-    def test_daily_quota_exceeded(self, mock_redis):
-        """Test daily quota when exceeded."""
-        # Mock Redis to return current usage that would exceed quota
-        mock_redis.get.return_value = b"800"  # 800 tokens used
+    def test_quota_allowed(self, mock_redis):
+        """Test that requests are allowed within quota."""
+        mock_redis.get.return_value = "500"  # 500 tokens used
+        mock_redis.pipeline.return_value.execute.return_value = [600, True]
         
-        # Should raise exception
-        with self.assertRaises(HTTPException) as context:
-            check_daily_quota("test_tenant", 300)  # 300 more tokens = 1100 total
-        
-        self.assertEqual(context.exception.status_code, 402)
-        self.assertIn("Daily token quota exceeded", context.exception.detail)
+        result = self.quota_limiter.check_quota("test_tenant", 100)
+        assert result is True
     
     @patch('api.middleware.rate_limit.redis_client')
-    @patch.dict('os.environ', {'DAILY_TOKEN_QUOTA': '1000'})
-    def test_daily_quota_first_usage(self, mock_redis):
-        """Test daily quota on first usage."""
-        # Mock Redis to return None (no previous usage)
-        mock_redis.get.return_value = None
+    def test_quota_exceeded(self, mock_redis):
+        """Test that requests are blocked when quota exceeded."""
+        mock_redis.get.return_value = "900"  # 900 tokens used
         
-        # Should not raise exception
-        try:
-            check_daily_quota("test_tenant", 500)
-        except HTTPException:
-            self.fail("Daily quota should not be exceeded on first usage")
-        
-        # Should increment usage
-        mock_redis.incrby.assert_called_once()
+        result = self.quota_limiter.check_quota("test_tenant", 200)
+        assert result is False
     
     @patch('api.middleware.rate_limit.redis_client')
-    def test_update_quota_usage(self, mock_redis):
-        """Test updating quota usage."""
-        # Should increment usage
-        update_quota_usage("test_tenant", 100)
+    def test_quota_redis_error(self, mock_redis):
+        """Test that requests are allowed when Redis is down."""
+        mock_redis.get.side_effect = Exception("Redis error")
         
-        mock_redis.incrby.assert_called_once()
-        mock_redis.expire.assert_called_once_with(mock_redis.incrby.return_value, 86400)
+        result = self.quota_limiter.check_quota("test_tenant", 100)
+        assert result is True
     
     @patch('api.middleware.rate_limit.redis_client')
-    def test_redis_unavailable_rate_limit(self, mock_redis):
-        """Test rate limit when Redis is unavailable."""
-        # Mock Redis to raise exception
-        mock_redis.get.side_effect = Exception("Redis unavailable")
+    def test_get_remaining_quota(self, mock_redis):
+        """Test getting remaining quota."""
+        mock_redis.get.return_value = "600"  # 600 tokens used
         
-        # Should not raise exception (graceful degradation)
-        try:
-            check_rate_limit(self.mock_request, "test_user")
-        except Exception as e:
-            if "Redis unavailable" in str(e):
-                self.fail("Should handle Redis unavailability gracefully")
+        remaining = self.quota_limiter.get_remaining_quota("test_tenant")
+        assert remaining == 400  # 1000 - 600 = 400
+
+
+class TestRateLimitMiddleware:
+    """Test rate limiting middleware."""
     
-    @patch('api.middleware.rate_limit.redis_client')
-    def test_redis_unavailable_quota(self, mock_redis):
-        """Test daily quota when Redis is unavailable."""
-        # Mock Redis to raise exception
-        mock_redis.get.side_effect = Exception("Redis unavailable")
+    @patch('api.middleware.rate_limit.rate_limiter')
+    def test_rate_limit_middleware_allowed(self, mock_rate_limiter):
+        """Test that middleware allows requests within limit."""
+        mock_rate_limiter.is_allowed.return_value = True
+        mock_rate_limiter.get_remaining.return_value = 3
         
-        # Should not raise exception (graceful degradation)
-        try:
-            check_daily_quota("test_tenant", 100)
-        except Exception as e:
-            if "Redis unavailable" in str(e):
-                self.fail("Should handle Redis unavailability gracefully")
+        with patch('api.middleware.rate_limit.jwt') as mock_jwt:
+            mock_jwt.decode.return_value = {"sub": "test_user"}
+            
+            response = client.get("/health")
+            assert response.status_code == 200
+    
+    @patch('api.middleware.rate_limit.rate_limiter')
+    def test_rate_limit_middleware_exceeded(self, mock_rate_limiter):
+        """Test that middleware blocks requests when limit exceeded."""
+        mock_rate_limiter.is_allowed.return_value = False
+        mock_rate_limiter.get_remaining.return_value = 0
+        
+        with patch('api.middleware.rate_limit.jwt') as mock_jwt:
+            mock_jwt.decode.return_value = {"sub": "test_user"}
+            
+            response = client.get("/health")
+            assert response.status_code == 429
+            assert "Rate limit exceeded" in response.json()["error"]
+    
+    def test_rate_limit_middleware_health_check(self):
+        """Test that health checks bypass rate limiting."""
+        response = client.get("/health")
+        assert response.status_code == 200
+    
+    @patch('api.middleware.rate_limit.rate_limiter')
+    def test_rate_limit_middleware_api_key(self, mock_rate_limiter):
+        """Test rate limiting with API key."""
+        mock_rate_limiter.is_allowed.return_value = True
+        mock_rate_limiter.get_remaining.return_value = 5
+        
+        response = client.get(
+            "/health",
+            headers={"Authorization": "Bearer pk_test_api_key_123"}
+        )
+        assert response.status_code == 200
+        
+        # Should use API key as identifier
+        mock_rate_limiter.is_allowed.assert_called_with("api_key:pk_test_api_key_123")
+    
+    @patch('api.middleware.rate_limit.rate_limiter')
+    def test_rate_limit_middleware_x_api_key(self, mock_rate_limiter):
+        """Test rate limiting with X-API-Key header."""
+        mock_rate_limiter.is_allowed.return_value = True
+        mock_rate_limiter.get_remaining.return_value = 5
+        
+        response = client.get(
+            "/health",
+            headers={"X-API-Key": "pk_test_api_key_456"}
+        )
+        assert response.status_code == 200
+        
+        # Should use API key as identifier
+        mock_rate_limiter.is_allowed.assert_called_with("api_key:pk_test_api_key_456")
+
+
+class TestQuotaIntegration:
+    """Test quota integration with answer endpoints."""
+    
+    @patch('api.middleware.rate_limit.check_quota')
+    @patch('api.middleware.rate_limit.get_remaining_quota')
+    @patch('api.dependencies.auth.get_current_user')
+    def test_answer_quota_exceeded(self, mock_auth, mock_get_remaining, mock_check_quota):
+        """Test that answer endpoint returns 402 when quota exceeded."""
+        # Mock user
+        mock_user = Mock()
+        mock_user.tenant_id = "test_tenant"
+        mock_auth.return_value = mock_user
+        
+        # Mock quota exceeded
+        mock_check_quota.return_value = False
+        mock_get_remaining.return_value = 50
+        
+        response = client.post(
+            "/answer",
+            headers={"Authorization": "Bearer test_token"},
+            json={
+                "query": "What is this about?",
+                "top_k": 10,
+                "rerank": True,
+                "max_ctx": 2000
+            }
+        )
+        
+        assert response.status_code == 402
+        assert "Daily token quota exceeded" in response.json()["detail"]
+    
+    @patch('api.middleware.rate_limit.check_quota')
+    @patch('api.dependencies.auth.get_current_user')
+    def test_stream_answer_quota_exceeded(self, mock_auth, mock_check_quota):
+        """Test that stream answer endpoint returns 402 when quota exceeded."""
+        # Mock user
+        mock_user = Mock()
+        mock_user.tenant_id = "test_tenant"
+        mock_auth.return_value = mock_user
+        
+        # Mock quota exceeded
+        mock_check_quota.return_value = False
+        
+        response = client.post(
+            "/answer/stream",
+            headers={"Authorization": "Bearer test_token"},
+            json={
+                "query": "What is this about?",
+                "top_k": 10,
+                "rerank": True,
+                "max_ctx": 2000
+            }
+        )
+        
+        assert response.status_code == 402
+        assert "Daily token quota exceeded" in response.json()["detail"]
+
+
+class TestRateLimitHeaders:
+    """Test rate limit headers in responses."""
+    
+    @patch('api.middleware.rate_limit.rate_limiter')
+    def test_rate_limit_headers(self, mock_rate_limiter):
+        """Test that rate limit headers are included in responses."""
+        mock_rate_limiter.is_allowed.return_value = True
+        mock_rate_limiter.get_remaining.return_value = 3
+        
+        response = client.get("/health")
+        
+        assert "X-RateLimit-Limit" in response.headers
+        assert "X-RateLimit-Remaining" in response.headers
+        assert response.headers["X-RateLimit-Limit"] == "60"
+        assert response.headers["X-RateLimit-Remaining"] == "3"
+    
+    @patch('api.middleware.rate_limit.rate_limiter')
+    def test_rate_limit_exceeded_headers(self, mock_rate_limiter):
+        """Test rate limit headers when limit exceeded."""
+        mock_rate_limiter.is_allowed.return_value = False
+        mock_rate_limiter.get_remaining.return_value = 0
+        
+        with patch('api.middleware.rate_limit.jwt') as mock_jwt:
+            mock_jwt.decode.return_value = {"sub": "test_user"}
+            
+            response = client.get("/health")
+            
+            assert response.status_code == 429
+            assert "X-RateLimit-Limit" in response.headers
+            assert "X-RateLimit-Remaining" in response.headers
+            assert "Retry-After" in response.headers
+            assert response.headers["Retry-After"] == "60"
 
 
 if __name__ == "__main__":
-    unittest.main()
+    pytest.main([__file__])

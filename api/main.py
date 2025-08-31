@@ -4,6 +4,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.middleware.cors import CORSMiddleware
+from api.middleware.rate_limit import rate_limit_middleware
 
 from api.routers.health import router as health_router
 from api.routers.ingest import router as ingest_router
@@ -29,6 +30,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add rate limiting middleware
+app.middleware("http")(rate_limit_middleware)
 
 app.include_router(health_router, prefix="")
 app.include_router(ingest_router, prefix="")
