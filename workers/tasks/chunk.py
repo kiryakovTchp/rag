@@ -6,7 +6,7 @@ from db.session import SessionLocal
 from services.chunking.pipeline import ChunkingPipeline
 from workers.app import celery_app
 from workers.tasks.index import index_document_embeddings
-from api.websocket import emit_job_event
+from api.websocket import emit_job_event_sync
 from services.job_manager import job_manager
 
 logger = logging.getLogger(__name__)
@@ -36,7 +36,7 @@ def chunk_document(self, document_id: int, tenant_id: str = None) -> dict:
             
             # Emit WebSocket event
             if tenant_id:
-                asyncio.create_task(job_manager.job_started(job.id))
+                asyncio.create_task(job_manager.job_started(job.id, tenant_id, document_id, "chunk"))
 
         # Get all elements for this document
         elements = db.query(Element).filter(Element.document_id == document_id).all()
@@ -70,7 +70,7 @@ def chunk_document(self, document_id: int, tenant_id: str = None) -> dict:
             
             # Emit WebSocket event
             if tenant_id:
-                asyncio.create_task(job_manager.job_progress(job.id, 85))
+                asyncio.create_task(job_manager.job_progress(job.id, 85, tenant_id, document_id, "chunk"))
 
         # Save chunks to database
         logger.info("Saving chunks to database...")
@@ -104,7 +104,7 @@ def chunk_document(self, document_id: int, tenant_id: str = None) -> dict:
             
             # Emit WebSocket event
             if tenant_id:
-                asyncio.create_task(job_manager.job_done(job.id))
+                asyncio.create_task(job_manager.job_done(job.id, tenant_id, document_id, "chunk"))
 
         # Create embed job and trigger embedding task
         logger.info(f"Creating embed job for document {document_id}")
@@ -140,7 +140,7 @@ def chunk_document(self, document_id: int, tenant_id: str = None) -> dict:
             
             # Emit WebSocket event
             if tenant_id:
-                asyncio.create_task(job_manager.job_failed(job.id, str(e)))
+                asyncio.create_task(job_manager.job_failed(job.id, str(e), tenant_id, document_id, "chunk"))
         raise
     finally:
         db.close()

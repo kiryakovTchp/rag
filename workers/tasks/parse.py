@@ -11,7 +11,7 @@ from services.parsing.pdf import PDFParser
 from services.parsing.tables import TableParser
 from storage.r2 import ObjectStore
 from workers.app import celery_app
-from api.websocket import emit_job_event
+from api.websocket import emit_job_event_sync
 from services.job_manager import job_manager
 
 logger = logging.getLogger(__name__)
@@ -42,7 +42,7 @@ def parse_document(self, document_id: int, tenant_id: str = None) -> dict:
             
             # Emit WebSocket event
             if tenant_id:
-                asyncio.create_task(job_manager.job_started(job.id))
+                asyncio.create_task(job_manager.job_started(job.id, tenant_id, document_id, "parse"))
 
         # Download file from S3
         logger.info("Downloading file from S3...")
@@ -76,7 +76,7 @@ def parse_document(self, document_id: int, tenant_id: str = None) -> dict:
                 
                 # Emit WebSocket event
                 if tenant_id:
-                    asyncio.create_task(job_manager.job_progress(job.id, 50))
+                    asyncio.create_task(job_manager.job_progress(job.id, 50, tenant_id, document_id, "parse"))
 
             # Extract tables if any
             logger.info("Extracting tables...")
@@ -109,7 +109,7 @@ def parse_document(self, document_id: int, tenant_id: str = None) -> dict:
                 
                 # Emit WebSocket event
                 if tenant_id:
-                    asyncio.create_task(job_manager.job_progress(job.id, 70))
+                    asyncio.create_task(job_manager.job_progress(job.id, 70, tenant_id, document_id, "parse"))
 
             # Create chunk job
             chunk_job = Job(type="chunk", status="queued", progress=0, document_id=document_id)
@@ -126,7 +126,7 @@ def parse_document(self, document_id: int, tenant_id: str = None) -> dict:
                 
                 # Emit WebSocket event
                 if tenant_id:
-                    asyncio.create_task(job_manager.job_done(job.id))
+                    asyncio.create_task(job_manager.job_done(job.id, tenant_id, document_id, "parse"))
 
             # Trigger chunking task
             from workers.tasks.chunk import chunk_document
@@ -156,7 +156,7 @@ def parse_document(self, document_id: int, tenant_id: str = None) -> dict:
             
             # Emit WebSocket event
             if tenant_id:
-                asyncio.create_task(job_manager.job_failed(job.id, str(e)))
+                asyncio.create_task(job_manager.job_failed(job.id, str(e), tenant_id, document_id, "parse"))
         raise
     finally:
         db.close()

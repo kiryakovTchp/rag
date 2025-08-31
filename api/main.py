@@ -9,6 +9,7 @@ from api.routers.health import router as health_router
 from api.routers.ingest import router as ingest_router
 from api.routers.query import router as query_router
 from api.routers.answer import router as answer_router
+from api.routers.websocket import router as websocket_router
 from api.routers.feedback import router as feedback_router
 from api.websocket import router as websocket_router
 from api.metrics import metrics_endpoint
@@ -33,6 +34,7 @@ app.include_router(health_router, prefix="")
 app.include_router(ingest_router, prefix="")
 app.include_router(query_router, prefix="")
 app.include_router(answer_router, prefix="")
+app.include_router(websocket_router, prefix="")
 app.include_router(feedback_router, prefix="")
 app.include_router(websocket_router, prefix="")
 

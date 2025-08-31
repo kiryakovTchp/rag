@@ -1,76 +1,77 @@
-"""Job management for pipeline tasks."""
+"""Job manager for WebSocket event emission."""
 
 import asyncio
-from typing import Dict, Any
 from datetime import datetime
-from api.websocket import emit_job_event
+from typing import Optional
+from api.websocket import emit_job_event_sync
+
 
 class JobManager:
-    """Manage job lifecycle and WebSocket events."""
+    """Manage job events and WebSocket emission."""
     
     def __init__(self):
-        self.jobs: Dict[int, Dict[str, Any]] = {}
-        self.job_counter = 0
+        self.heartbeat_interval = 5  # seconds
     
-    def create_job(self, document_id: int, job_type: str, tenant_id: str) -> int:
-        """Create a new job."""
-        self.job_counter += 1
-        job_id = self.job_counter
-        
-        self.jobs[job_id] = {
-            "id": job_id,
-            "document_id": document_id,
-            "type": job_type,
-            "tenant_id": tenant_id,
-            "status": "created",
-            "progress": 0,
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow()
-        }
-        
-        return job_id
-    
-    async def emit_event(self, job_id: int, event: str, progress: int = 0, error: str = None):
-        """Emit job event to WebSocket clients."""
-        if job_id not in self.jobs:
-            return
-        
-        job = self.jobs[job_id]
-        job["status"] = event
-        job["progress"] = progress
-        job["updated_at"] = datetime.utcnow()
-        
-        if error:
-            job["error"] = error
-        
+    async def job_started(self, job_id: int, tenant_id: str = "", document_id: Optional[int] = None, job_type: Optional[str] = None):
+        """Emit job started event."""
         event_data = {
-            "event": event,
+            "event": f"{job_type or 'job'}_started",
             "job_id": job_id,
-            "document_id": job["document_id"],
-            "type": job["type"],
-            "progress": progress
+            "document_id": document_id,
+            "type": job_type or "job",
+            "progress": 0,
+            "ts": datetime.utcnow().isoformat()
         }
-        
-        if error:
-            event_data["error"] = error
-        
-        await emit_job_event(job["tenant_id"], event_data)
+        emit_job_event_sync(tenant_id, event_data)
     
-    async def job_started(self, job_id: int):
-        """Job started event."""
-        await self.emit_event(job_id, "started", 0)
+    async def job_progress(self, job_id: int, progress: int, tenant_id: str = "", document_id: Optional[int] = None, job_type: Optional[str] = None):
+        """Emit job progress event."""
+        event_data = {
+            "event": f"{job_type or 'job'}_progress",
+            "job_id": job_id,
+            "document_id": document_id,
+            "type": job_type or "job",
+            "progress": progress,
+            "ts": datetime.utcnow().isoformat()
+        }
+        emit_job_event_sync(tenant_id, event_data)
     
-    async def job_progress(self, job_id: int, progress: int):
-        """Job progress event."""
-        await self.emit_event(job_id, "progress", progress)
+    async def job_done(self, job_id: int, tenant_id: str = "", document_id: Optional[int] = None, job_type: Optional[str] = None):
+        """Emit job done event."""
+        event_data = {
+            "event": f"{job_type or 'job'}_done",
+            "job_id": job_id,
+            "document_id": document_id,
+            "type": job_type or "job",
+            "progress": 100,
+            "ts": datetime.utcnow().isoformat()
+        }
+        emit_job_event_sync(tenant_id, event_data)
     
-    async def job_done(self, job_id: int):
-        """Job completed successfully."""
-        await self.emit_event(job_id, "done", 100)
+    async def job_failed(self, job_id: int, error: str, tenant_id: str = "", document_id: Optional[int] = None, job_type: Optional[str] = None):
+        """Emit job failed event."""
+        event_data = {
+            "event": f"{job_type or 'job'}_failed",
+            "job_id": job_id,
+            "document_id": document_id,
+            "type": job_type or "job",
+            "progress": 0,
+            "error": error,
+            "ts": datetime.utcnow().isoformat()
+        }
+        emit_job_event_sync(tenant_id, event_data)
     
-    async def job_failed(self, job_id: int, error: str):
-        """Job failed event."""
-        await self.emit_event(job_id, "failed", 0, error)
+    async def heartbeat(self, job_id: int, tenant_id: str = "", document_id: Optional[int] = None, job_type: Optional[str] = None):
+        """Emit heartbeat event."""
+        event_data = {
+            "event": "heartbeat",
+            "job_id": job_id,
+            "document_id": document_id,
+            "type": job_type or "job",
+            "ts": datetime.utcnow().isoformat()
+        }
+        emit_job_event_sync(tenant_id, event_data)
 
-# Global job manager instance
+
+# Global instance
 job_manager = JobManager()

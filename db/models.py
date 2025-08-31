@@ -90,6 +90,16 @@ class Embedding(Base):
     chunk = relationship("Chunk", backref="embedding")
 
 
+class User(Base):
+    __tablename__ = "users"
+
+    id = Column(String(100), primary_key=True, index=True)
+    tenant_id = Column(String(100), nullable=False, index=True)
+    email = Column(String(255), nullable=False)
+    role = Column(String(50), default="user")
+    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+
+
 class AnswerLog(Base):
     __tablename__ = "answer_logs"
 
@@ -114,6 +124,12 @@ class APIKey(Base):
     role = Column(String(50), nullable=False, server_default="user")
     created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
     revoked_at = Column(DateTime(timezone=True), nullable=True)
+    
+    @staticmethod
+    def hash_key(key: str) -> str:
+        """Hash API key for storage."""
+        import hashlib
+        return hashlib.sha256(key.encode()).hexdigest()
 
 
 class AnswerFeedback(Base):

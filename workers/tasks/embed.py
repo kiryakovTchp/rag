@@ -14,7 +14,7 @@ from db.session import SessionLocal
 from services.embed.provider import EmbeddingProvider
 from services.index.pgvector import PGVectorIndex
 from workers.app import celery_app
-from api.websocket import emit_job_event
+from api.websocket import emit_job_event_sync
 from services.job_manager import job_manager
 
 logger = logging.getLogger(__name__)
@@ -65,7 +65,7 @@ def embed_document(self, document_id: int, tenant_id: str = None) -> dict:
         
         # Emit WebSocket event
         if tenant_id:
-            asyncio.create_task(job_manager.job_started(job.id))
+            asyncio.create_task(job_manager.job_started(job.id, tenant_id, document_id, "embed"))
         
         # 2) выбрать чанки без эмбеддингов или все (идемпотентно)
         chunks = session.query(Chunk).filter(
@@ -116,7 +116,7 @@ def embed_document(self, document_id: int, tenant_id: str = None) -> dict:
             
             # Emit WebSocket event
             if tenant_id:
-                asyncio.create_task(job_manager.job_progress(job.id, progress))
+                asyncio.create_task(job_manager.job_progress(job.id, progress, tenant_id, document_id, "embed"))
             
             logger.info(f"Processed {processed}/{total_chunks} chunks (progress: {progress}%)")
         
@@ -127,7 +127,7 @@ def embed_document(self, document_id: int, tenant_id: str = None) -> dict:
         
         # Emit WebSocket event
         if tenant_id:
-            asyncio.create_task(job_manager.job_done(job.id))
+            asyncio.create_task(job_manager.job_done(job.id, tenant_id, document_id, "embed"))
         
         logger.info(f"Completed embed job {job.id} for document {document_id}")
         
@@ -144,7 +144,7 @@ def embed_document(self, document_id: int, tenant_id: str = None) -> dict:
             
             # Emit WebSocket event
             if tenant_id:
-                asyncio.create_task(job_manager.job_failed(job.id, str(e)))
+                asyncio.create_task(job_manager.job_failed(job.id, str(e), tenant_id, document_id, "embed"))
         
         raise
     finally:
