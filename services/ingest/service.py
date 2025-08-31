@@ -55,7 +55,7 @@ class IngestService:
             self.db.commit()
 
             # Trigger parse task
-            parse_document.apply_async(args=[document.id], queue="parse")
+            parse_document.apply_async(args=[document.id, tenant_id], queue="parse")
 
             return job.id
 

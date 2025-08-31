@@ -1,6 +1,8 @@
 import logging
 import os
 import tempfile
+import asyncio
+from datetime import datetime
 
 from db.models import Document, Element, Job
 from db.session import SessionLocal
@@ -9,12 +11,14 @@ from services.parsing.pdf import PDFParser
 from services.parsing.tables import TableParser
 from storage.r2 import ObjectStore
 from workers.app import celery_app
+from api.websocket import emit_job_event
+from services.job_manager import job_manager
 
 logger = logging.getLogger(__name__)
 
 
 @celery_app.task(bind=True, queue="parse")
-def parse_document(self, document_id: int) -> dict:
+def parse_document(self, document_id: int, tenant_id: str = None) -> dict:
     """Parse document into elements."""
     logger.info(f"Starting parse task for document {document_id}")
     db = SessionLocal()
@@ -35,6 +39,10 @@ def parse_document(self, document_id: int) -> dict:
             job.progress = 10
             db.commit()
             logger.info(f"Updated job {job.id} status to running, progress: 10%")
+            
+            # Emit WebSocket event
+            if tenant_id:
+                asyncio.create_task(job_manager.job_started(job.id))
 
         # Download file from S3
         logger.info("Downloading file from S3...")
@@ -65,6 +73,10 @@ def parse_document(self, document_id: int) -> dict:
                 job.progress = 50
                 db.commit()
                 logger.info(f"Updated job {job.id} progress: 50%")
+                
+                # Emit WebSocket event
+                if tenant_id:
+                    asyncio.create_task(job_manager.job_progress(job.id, 50))
 
             # Extract tables if any
             logger.info("Extracting tables...")
@@ -94,6 +106,10 @@ def parse_document(self, document_id: int) -> dict:
                 job.progress = 70
                 db.commit()
                 logger.info(f"Updated job {job.id} progress: 70%")
+                
+                # Emit WebSocket event
+                if tenant_id:
+                    asyncio.create_task(job_manager.job_progress(job.id, 70))
 
             # Create chunk job
             chunk_job = Job(type="chunk", status="queued", progress=0, document_id=document_id)
@@ -107,11 +123,15 @@ def parse_document(self, document_id: int) -> dict:
                 job.progress = 100
                 db.commit()
                 logger.info(f"Updated job {job.id} status to done, progress: 100%")
+                
+                # Emit WebSocket event
+                if tenant_id:
+                    asyncio.create_task(job_manager.job_done(job.id))
 
             # Trigger chunking task
             from workers.tasks.chunk import chunk_document
 
-            chunk_document.apply_async(args=[document_id], queue="chunk")
+            chunk_document.apply_async(args=[document_id, tenant_id], queue="chunk")
             logger.info(f"Triggered chunk task for document {document_id}")
 
             return {
@@ -133,6 +153,10 @@ def parse_document(self, document_id: int) -> dict:
             job.error = str(e)
             db.commit()
             logger.error(f"Updated job {job.id} status to error: {e}")
+            
+            # Emit WebSocket event
+            if tenant_id:
+                asyncio.create_task(job_manager.job_failed(job.id, str(e)))
         raise
     finally:
         db.close()

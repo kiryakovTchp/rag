@@ -145,6 +145,14 @@ ANSWER_CONTENT_FILTER=false             # Включить фильтр конт
 
 # Frontend CORS
 FRONTEND_ORIGINS=http://localhost:3000  # Разрешённые домены для CORS (через запятую)
+
+# Authentication
+REQUIRE_AUTH=true                        # Требовать аутентификацию для всех endpoints
+NEXTAUTH_SECRET=your-secret-key          # Секрет для JWT токенов (общий с фронтом)
+
+# Rate Limiting
+RATE_LIMIT_PER_MIN=60                    # Лимит запросов в минуту на пользователя/ключ
+DAILY_TOKEN_QUOTA=200000                 # Дневная квота токенов на tenant
 ```
 
 #### Примеры использования
