@@ -3,7 +3,7 @@
 import json
 import asyncio
 import logging
-from typing import Callable, Dict, Any, Optional
+from typing import Callable, Dict, Any, Optional, Union
 from datetime import datetime
 import aioredis
 from contextlib import asynccontextmanager
@@ -14,7 +14,7 @@ logger = logging.getLogger(__name__)
 class EventBus:
     """Redis-based event bus for inter-service communication."""
 
-    def __init__(self, redis_url: str | None = None):
+    def __init__(self, redis_url: Union[str, None] = None):
         """Initialize Event Bus.
 
         Args:

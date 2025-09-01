@@ -99,7 +99,7 @@ make dev-down
 
 ### Realtime Status
 
-WebSocket endpoint для получения статуса обработки документов в реальном времени:
+WebSocket endpoint для получения статуса обработки документов в реальном времени через Redis Pub/Sub:
 
 ```bash
 # Подключение к WebSocket
@@ -117,7 +117,12 @@ ws://localhost:8000/ws/jobs
 }
 ```
 
-**Переменные окружения:**
+**Архитектура:**
+- Workers публикуют события в Redis каналы `{tenant_id}.jobs`
+- WebSocket API подписывается на Redis и ретранслирует события клиентам
+- Изолированные каналы для каждого tenant обеспечивают безопасность
+
+**Обязательные переменные окружения:**
 - `REDIS_URL` - URL для подключения к Redis (по умолчанию: `redis://localhost:6379`)
 - `REQUIRE_AUTH=true` - требовать аутентификацию для WebSocket
 - `NEXTAUTH_SECRET` - секрет для JWT токенов

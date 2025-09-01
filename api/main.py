@@ -2,7 +2,7 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from fastapi import FastAPI, WebSocket, WebSocketDisconnect
+from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.middleware.rate_limit import rate_limit_middleware
 
@@ -10,7 +10,7 @@ from api.routers.health import router as health_router
 from api.routers.ingest import router as ingest_router
 from api.routers.query import router as query_router
 from api.routers.answer import router as answer_router
-from api.routers.websocket import router as websocket_router
+from api.websocket import router as websocket_router
 from api.routers.auth import router as auth_router
 from api.routers.feedback import router as feedback_router
 from api.metrics import metrics_endpoint
@@ -50,6 +50,7 @@ if os.getenv("ADMIN_API_ENABLED", "false").lower() == "true":
     admin_token = os.getenv("ADMIN_API_TOKEN")
     if not admin_token:
         raise ValueError("ADMIN_API_ENABLED=true requires ADMIN_API_TOKEN to be set")
-    
+
     from api.routers.admin import router as admin_router
+
     app.include_router(admin_router, prefix="")

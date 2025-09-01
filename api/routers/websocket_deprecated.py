@@ -21,10 +21,10 @@ active_connections: Dict[str, List[WebSocket]] = {}
 
 class ConnectionManager:
     """Manage WebSocket connections per tenant."""
-    
+
     def __init__(self):
         self.active_connections: Dict[str, List[WebSocket]] = {}
-    
+
     async def connect(self, websocket: WebSocket, tenant_id: str):
         """Connect a WebSocket for a tenant."""
         await websocket.accept()
@@ -32,7 +32,7 @@ class ConnectionManager:
             self.active_connections[tenant_id] = []
         self.active_connections[tenant_id].append(websocket)
         logger.info(f"WebSocket connected for tenant {tenant_id}")
-    
+
     def disconnect(self, websocket: WebSocket, tenant_id: str):
         """Disconnect a WebSocket for a tenant."""
         if tenant_id in self.active_connections:
@@ -40,7 +40,7 @@ class ConnectionManager:
             if not self.active_connections[tenant_id]:
                 del self.active_connections[tenant_id]
         logger.info(f"WebSocket disconnected for tenant {tenant_id}")
-    
+
     async def send_personal_message(self, message: dict, tenant_id: str):
         """Send message to all connections of a tenant."""
         if tenant_id in self.active_connections:
@@ -51,7 +51,7 @@ class ConnectionManager:
                 except Exception as e:
                     logger.error(f"Failed to send message to WebSocket: {e}")
                     disconnected.append(connection)
-            
+
             # Remove disconnected connections
             for connection in disconnected:
                 self.disconnect(connection, tenant_id)
@@ -66,13 +66,13 @@ async def websocket_jobs(websocket: WebSocket):
     try:
         # Accept connection first to get headers
         await websocket.accept()
-        
+
         # Get authentication token from query params or headers
         token = websocket.query_params.get("token")
         if not token:
             await websocket.close(code=4001, reason="Authentication required")
             return
-        
+
         # Validate token and get user
         try:
             # For now, we'll use a simple token validation
@@ -80,26 +80,26 @@ async def websocket_jobs(websocket: WebSocket):
             if not token.startswith("Bearer "):
                 await websocket.close(code=4001, reason="Invalid token format")
                 return
-            
+
             # Extract tenant_id from token (simplified for now)
             # In production, decode JWT and extract tenant_id
             tenant_id = "default"  # Placeholder
-            
+
         except Exception as e:
             logger.error(f"Token validation failed: {e}")
             await websocket.close(code=4001, reason="Invalid token")
             return
-        
+
         # Connect to manager
         await manager.connect(websocket, tenant_id)
-        
+
         # Send initial connection message
-        await websocket.send_text(json.dumps({
-            "event": "connected",
-            "tenant_id": tenant_id,
-            "ts": datetime.utcnow().isoformat()
-        }))
-        
+        await websocket.send_text(
+            json.dumps(
+                {"event": "connected", "tenant_id": tenant_id, "ts": datetime.utcnow().isoformat()}
+            )
+        )
+
         # Keep connection alive
         try:
             while True:
@@ -112,7 +112,7 @@ async def websocket_jobs(websocket: WebSocket):
         except Exception as e:
             logger.error(f"WebSocket error: {e}")
             manager.disconnect(websocket, tenant_id)
-            
+
     except Exception as e:
         logger.error(f"WebSocket connection error: {e}")
         try:
