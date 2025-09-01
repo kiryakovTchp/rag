@@ -22,14 +22,19 @@ class ConnectionManager:
         self.active_connections: Dict[str, List[WebSocket]] = {}
         self._subscription_tasks: Dict[str, asyncio.Task] = {}
 
-    async def connect(self, websocket: WebSocket, tenant_id: str):
+        async def connect(self, websocket: WebSocket, tenant_id: str):
         """Connect a new WebSocket client and subscribe to Redis channel."""
         await websocket.accept()
         if tenant_id not in self.active_connections:
             self.active_connections[tenant_id] = []
             # Start Redis subscription for this tenant
-            await self._start_subscription(tenant_id)
-
+            try:
+                await self._start_subscription(tenant_id)
+            except Exception as e:
+                logger.error(f"Failed to connect WebSocket for tenant {tenant_id}: {e}")
+                await websocket.close(code=4000, reason="Redis connection failed")
+                raise
+        
         self.active_connections[tenant_id].append(websocket)
         logger.info(f"WebSocket connected for tenant {tenant_id}")
 
@@ -43,15 +48,26 @@ class ConnectionManager:
                 self._stop_subscription(tenant_id)
                 logger.info(f"WebSocket disconnected for tenant {tenant_id}")
 
-    async def _start_subscription(self, tenant_id: str):
+        async def _start_subscription(self, tenant_id: str):
         """Start Redis subscription for tenant."""
         if tenant_id in self._subscription_tasks:
             return
-
+        
         topic = f"{tenant_id}.jobs"
-        task = asyncio.create_task(subscribe_loop(topic, self._handle_redis_message))
-        self._subscription_tasks[tenant_id] = task
-        logger.info(f"Started Redis subscription for {topic}")
+        try:
+            task = asyncio.create_task(subscribe_loop(topic, self._handle_redis_message))
+            self._subscription_tasks[tenant_id] = task
+            logger.info(f"Started Redis subscription for {topic}")
+        except Exception as e:
+            logger.error(f"Failed to start Redis subscription for {topic}: {e}")
+            # Close WebSocket connection with error code
+            if tenant_id in self.active_connections:
+                for connection in self.active_connections[tenant_id]:
+                    try:
+                        await connection.close(code=4000, reason="Redis connection failed")
+                    except Exception:
+                        pass
+            raise
 
     def _stop_subscription(self, tenant_id: str):
         """Stop Redis subscription for tenant."""

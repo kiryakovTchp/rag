@@ -3,7 +3,7 @@
 import asyncio
 from datetime import datetime
 from typing import Optional
-from api.routers.websocket import emit_job_event
+from services.events.bus import publish_event
 
 
 class JobManager:
@@ -14,6 +14,10 @@ class JobManager:
     
     async def job_started(self, job_id: int, tenant_id: str = "", document_id: Optional[int] = None, job_type: Optional[str] = None):
         """Emit job started event."""
+        if not tenant_id:
+            return
+            
+        topic = f"{tenant_id}.jobs"
         event_data = {
             "event": f"{job_type or 'job'}_started",
             "job_id": job_id,
@@ -22,10 +26,14 @@ class JobManager:
             "progress": 0,
             "ts": datetime.utcnow().isoformat()
         }
-        await emit_job_event(tenant_id, event_data)
+        await publish_event(topic, event_data)
     
     async def job_progress(self, job_id: int, progress: int, tenant_id: str = "", document_id: Optional[int] = None, job_type: Optional[str] = None):
         """Emit job progress event."""
+        if not tenant_id:
+            return
+            
+        topic = f"{tenant_id}.jobs"
         event_data = {
             "event": f"{job_type or 'job'}_progress",
             "job_id": job_id,
@@ -34,10 +42,14 @@ class JobManager:
             "progress": progress,
             "ts": datetime.utcnow().isoformat()
         }
-        await emit_job_event(tenant_id, event_data)
+        await publish_event(topic, event_data)
     
     async def job_done(self, job_id: int, tenant_id: str = "", document_id: Optional[int] = None, job_type: Optional[str] = None):
         """Emit job done event."""
+        if not tenant_id:
+            return
+            
+        topic = f"{tenant_id}.jobs"
         event_data = {
             "event": f"{job_type or 'job'}_done",
             "job_id": job_id,
@@ -46,10 +58,14 @@ class JobManager:
             "progress": 100,
             "ts": datetime.utcnow().isoformat()
         }
-        await emit_job_event(tenant_id, event_data)
+        await publish_event(topic, event_data)
     
     async def job_failed(self, job_id: int, error: str, tenant_id: str = "", document_id: Optional[int] = None, job_type: Optional[str] = None):
         """Emit job failed event."""
+        if not tenant_id:
+            return
+            
+        topic = f"{tenant_id}.jobs"
         event_data = {
             "event": f"{job_type or 'job'}_failed",
             "job_id": job_id,
@@ -59,10 +75,14 @@ class JobManager:
             "error": error,
             "ts": datetime.utcnow().isoformat()
         }
-        await emit_job_event(tenant_id, event_data)
+        await publish_event(topic, event_data)
     
     async def heartbeat(self, job_id: int, tenant_id: str = "", document_id: Optional[int] = None, job_type: Optional[str] = None):
         """Emit heartbeat event."""
+        if not tenant_id:
+            return
+            
+        topic = f"{tenant_id}.jobs"
         event_data = {
             "event": "heartbeat",
             "job_id": job_id,
@@ -70,7 +90,7 @@ class JobManager:
             "type": job_type or "job",
             "ts": datetime.utcnow().isoformat()
         }
-        await emit_job_event(tenant_id, event_data)
+        await publish_event(topic, event_data)
 
 
 # Global instance
