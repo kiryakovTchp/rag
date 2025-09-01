@@ -57,6 +57,14 @@
 - Эффект/риски: + Развязка workers и API. + Упрощение тестирования. + Масштабируемость WebSocket. + Real-time статус. - Зависимость от Redis. - Сложность отладки через Redis.
 - Следующие шаги: S4-2 - WebSocket клиент, real-time UI, job monitoring dashboard
 
+## 2025-01-27 (Sprint 4 - Observability Stack)
+- Дата: 2025-01-27
+- Что сделано: S4-2 полноценный observability stack с OpenTelemetry + Prometheus + Grafana. Сквозная трассировка API/workers, метрики производительности, дашборды и алёрты.
+- Почему так: Нужна production-ready наблюдаемость для диагностики проблем, мониторинга SLOs и оперативного реагирования на деградации. OpenTelemetry выбран как industry standard.
+- Как работает: api/tracing.py и workers/tracing.py с OTLP экспортом в Jaeger, Prometheus метрики на /metrics, Grafana дашборды с алёртами, TracedTask для Celery с автоматическими метриками.
+- Эффект/риски: + Сквозная трассировка через все компоненты. + Production метрики и алёрты. + Стандартизированный подход. + Готовность к масштабированию. - Сложность настройки. - Дополнительные сервисы для поддержки.
+- Следующие шаги: S4-3 - WebSocket клиент, real-time UI, job monitoring dashboard
+
 Шаблон записи:
 - Дата:
 - Что сделано:

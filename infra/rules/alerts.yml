@@ -1,0 +1,96 @@
+groups:
+  - name: api_alerts
+    rules:
+      # High latency alert
+      - alert: HighQueryLatency
+        expr: histogram_quantile(0.95, query_latency_seconds_bucket) > 2.5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High query latency detected"
+          description: "P95 query latency is {{ $value }}s for the last 5 minutes"
+
+      # High error rate alert
+      - alert: HighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m]) > 0.01
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "High error rate detected"
+          description: "Error rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+
+      # Redis publish failures
+      - alert: RedisPublishFailures
+        expr: increase(redis_publish_failures_total[1m]) > 0
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Redis publish failures detected"
+          description: "{{ $value }} Redis publish failures in the last minute"
+
+  - name: worker_alerts
+    rules:
+      # Worker task failures
+      - alert: HighWorkerTaskFailureRate
+        expr: rate(worker_tasks_processed_total{status="failure"}[5m]) / rate(worker_tasks_processed_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High worker task failure rate"
+          description: "Worker task failure rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+
+      # Long queue length
+      - alert: LongQueueLength
+        expr: worker_queue_length > 100
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Long queue length detected"
+          description: "Queue length is {{ $value }} jobs"
+
+      # Slow ingest jobs
+      - alert: SlowIngestJobs
+        expr: histogram_quantile(0.95, ingest_job_duration_seconds_bucket) > 300
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Slow ingest jobs detected"
+          description: "P95 ingest job duration is {{ $value }}s for the last 5 minutes"
+
+  - name: infrastructure_alerts
+    rules:
+      # High CPU usage
+      - alert: HighCPUUsage
+        expr: 100 - (avg by (instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is {{ $value }}% for the last 5 minutes"
+
+      # High memory usage
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is {{ $value }}% for the last 5 minutes"
+
+      # Disk space low
+      - alert: LowDiskSpace
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk space detected"
+          description: "Disk space is {{ $value }}% available"

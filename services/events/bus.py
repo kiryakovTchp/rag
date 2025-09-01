@@ -8,6 +8,14 @@ from datetime import datetime
 import aioredis
 from contextlib import asynccontextmanager
 
+# Import metrics if available (API context)
+try:
+    from api.tracing import record_redis_failure
+except ImportError:
+    # Workers context - use dummy function
+    def record_redis_failure(tenant: str, topic: str):
+        pass
+
 logger = logging.getLogger(__name__)
 
 
@@ -59,6 +67,9 @@ class EventBus:
 
         except Exception as e:
             logger.error(f"Failed to publish event to {topic}: {e}")
+            # Record failure metric
+            tenant_id = topic.split(".")[0] if "." in topic else "unknown"
+            record_redis_failure(tenant_id, topic)
             return False
 
     async def subscribe_loop(self, topic: str, handler: Callable[[Dict[str, Any]], None]) -> None:

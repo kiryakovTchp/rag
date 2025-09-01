@@ -14,12 +14,20 @@ from api.websocket import router as websocket_router
 from api.routers.auth import router as auth_router
 from api.routers.feedback import router as feedback_router
 from api.metrics import metrics_endpoint
+from api.tracing import setup_tracing, instrument_fastapi, instrument_redis, instrument_sqlalchemy, instrument_logging, metrics_middleware
 
 # Load environment variables from .env file
 env_path = Path(__file__).parent.parent / ".env"
 load_dotenv(env_path)
 
 app = FastAPI(title="PromoAI RAG API")
+
+# Setup OpenTelemetry tracing
+setup_tracing()
+instrument_fastapi(app)
+instrument_redis()
+instrument_sqlalchemy()
+instrument_logging()
 
 # Configure CORS
 frontend_origins = os.getenv("FRONTEND_ORIGINS", "http://localhost:3000").split(",")
@@ -33,6 +41,9 @@ app.add_middleware(
 
 # Add rate limiting middleware
 app.middleware("http")(rate_limit_middleware)
+
+# Add metrics middleware
+app.middleware("http")(metrics_middleware)
 
 app.include_router(health_router, prefix="")
 app.include_router(ingest_router, prefix="")

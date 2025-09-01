@@ -99,7 +99,104 @@ make dev-down
 
 ### Realtime Status
 
-WebSocket endpoint для получения статуса обработки документов в реальном времени через Redis Pub/Sub:
+WebSocket endpoint для real-time статуса jobs: `/ws/jobs`
+
+**Архитектура:**
+- Workers публикуют события в Redis Pub/Sub
+- API WebSocket подписывается на Redis каналы
+- Клиенты получают события через WebSocket
+
+**Формат событий:**
+```json
+{
+  "event": "parse_started|parse_done|parse_failed",
+  "job_id": 123,
+  "document_id": 456,
+  "type": "parse",
+  "progress": 0-100,
+  "tenant_id": "tenant123",
+  "ts": "2024-01-01T00:00:00Z"
+}
+```
+
+**Обязательные переменные окружения:**
+- `REDIS_URL` - URL для Redis (по умолчанию: `redis://localhost:6379`)
+- `REQUIRE_AUTH=true` - требовать аутентификацию для WebSocket
+- `NEXTAUTH_SECRET` - секрет для JWT токенов
+
+### Observability & Monitoring
+
+Система оснащена полноценным стеком наблюдаемости для production-ready мониторинга:
+
+#### OpenTelemetry Tracing
+
+**Сквозная трассировка** через все компоненты:
+- **Cloudflare Workers** → генерируют traceId
+- **FastAPI API** → создает spans для API calls
+- **Celery Workers** → создают spans для task execution
+- **Redis** → инструментируется для показа операций
+
+**Конфигурация:**
+```bash
+export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
+export OTEL_SERVICE_NAME=api  # или 'worker' для workers
+export OTEL_TRACES_SAMPLER=parentbased_traceidratio
+export OTEL_TRACES_SAMPLER_ARG=1.0
+```
+
+#### Prometheus Metrics
+
+**API метрики:**
+- `query_latency_seconds{route,tenant,method}` - histogram с P50/P95/P99
+- `tenant_queries_total{tenant,route,method}` - counter количества запросов
+- `redis_publish_failures_total{tenant,topic}` - counter неудачных публикаций
+
+**Worker метрики:**
+- `ingest_job_duration_seconds{tenant,job_type,status}` - histogram по этапам ingestion
+- `embedding_duration_seconds{tenant,model,text_count}` - histogram для embeddings
+- `queue_length{queue_name}` - gauge длины очереди
+
+#### Grafana Dashboards
+
+**Доступные дашборды:**
+- **API Overview** - основные метрики API, latency, error rates
+- **Workers Overview** - производительность workers, queue length, job duration
+
+**Алёрты:**
+- P95 query_latency_seconds > 2.5s на протяжении 5 минут
+- Доля 5xx ошибок > 1% за 5 минут
+- redis_publish_failures_total > 0 за минуту
+- queue_length > 100 jobs
+
+#### Запуск Observability Stack
+
+```bash
+# Запустить Jaeger, Prometheus, Grafana
+./scripts/start_observability.sh
+
+# Или вручную
+cd infra
+docker-compose -f observability.yml up -d
+```
+
+**Доступные сервисы:**
+- **Jaeger UI**: http://localhost:16686 - просмотр трасс
+- **Prometheus**: http://localhost:9090 - метрики и алёрты
+- **Grafana**: http://localhost:3000 (admin/admin) - дашборды
+- **Redis Monitor**: localhost:6380 - мониторинг Redis
+
+#### Тестирование Observability
+
+```bash
+# Запустить API с tracing
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 OTEL_SERVICE_NAME=api uvicorn api.main:app --reload
+
+# Запустить worker с tracing
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 OTEL_SERVICE_NAME=worker celery -A workers.app worker --loglevel=info
+
+# Запустить тесты
+pytest tests/test_otel_integration.py
+```
 
 ```bash
 # Подключение к WebSocket

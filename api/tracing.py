@@ -1,158 +1,180 @@
-"""OpenTelemetry tracing configuration."""
+"""OpenTelemetry configuration for API tracing and metrics."""
 
 import os
+import logging
+from typing import Optional
+
 from opentelemetry import trace
-from opentelemetry.exporter.jaeger.thrift import JaegerExporter
 from opentelemetry.sdk.trace import TracerProvider
 from opentelemetry.sdk.trace.export import BatchSpanProcessor
+from opentelemetry.sdk.resources import Resource
+from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
 from opentelemetry.instrumentation.fastapi import FastAPIInstrumentor
-from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
 from opentelemetry.instrumentation.redis import RedisInstrumentor
-from opentelemetry.instrumentation.requests import RequestsInstrumentor
+from opentelemetry.instrumentation.sqlalchemy import SQLAlchemyInstrumentor
+from opentelemetry.instrumentation.logging import LoggingInstrumentor
 
-# Initialize tracer
-trace.set_tracer_provider(TracerProvider())
-tracer = trace.get_tracer(__name__)
+from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
+from fastapi import Request, Response
+from fastapi.responses import Response as FastAPIResponse
+import time
 
-# Configure Jaeger exporter
-jaeger_exporter = JaegerExporter(
-    agent_host_name=os.getenv("JAEGER_HOST", "localhost"),
-    agent_port=int(os.getenv("JAEGER_PORT", "6831")),
+logger = logging.getLogger(__name__)
+
+# Prometheus metrics
+QUERY_LATENCY = Histogram(
+    "query_latency_seconds",
+    "Query latency in seconds",
+    ["route", "tenant", "method"],
+    buckets=[0.1, 0.25, 0.5, 1.0, 2.5, 5.0, 10.0]
 )
 
-# Add span processor
-span_processor = BatchSpanProcessor(jaeger_exporter)
-trace.get_tracer_provider().add_span_processor(span_processor)
+TENANT_QUERIES = Counter(
+    "tenant_queries_total",
+    "Total queries per tenant",
+    ["tenant", "route", "method"]
+)
 
+REDIS_PUBLISH_FAILURES = Counter(
+    "redis_publish_failures_total",
+    "Total Redis publish failures",
+    ["tenant", "topic"]
+)
 
-def setup_tracing(app):
-    """Setup OpenTelemetry tracing for FastAPI app."""
-    FastAPIInstrumentor.instrument_app(app)
+INGEST_JOBS = Counter(
+    "ingest_jobs_total",
+    "Total ingest jobs",
+    ["tenant", "status", "type"]
+)
+
+# Gauge for queue length (will be updated by workers)
+QUEUE_LENGTH = Gauge(
+    "queue_length",
+    "Number of jobs in queue",
+    ["queue_name"]
+)
+
+def setup_tracing():
+    """Setup OpenTelemetry tracing."""
+    # Get configuration from environment
+    otel_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
+    service_name = os.getenv("OTEL_SERVICE_NAME", "api")
     
-    # Instrument SQLAlchemy
-    SQLAlchemyInstrumentor().instrument()
+    # Create resource with service information
+    resource = Resource.create({
+        "service.name": service_name,
+        "service.version": "1.0.0",
+        "deployment.environment": os.getenv("ENVIRONMENT", "development")
+    })
     
-    # Instrument Redis
-    RedisInstrumentor().instrument()
+    # Create tracer provider
+    provider = TracerProvider(resource=resource)
     
-    # Instrument HTTP requests
-    RequestsInstrumentor().instrument()
+    # Add OTLP exporter
+    if otel_endpoint != "none":
+        otlp_exporter = OTLPSpanExporter(endpoint=otel_endpoint)
+        provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
+    
+    # Set global tracer provider
+    trace.set_tracer_provider(provider)
+    
+    # Get tracer
+    tracer = trace.get_tracer(__name__)
+    
+    logger.info(f"OpenTelemetry tracing initialized for {service_name}")
+    return tracer
 
+def instrument_fastapi(app):
+    """Instrument FastAPI with OpenTelemetry."""
+    try:
+        FastAPIInstrumentor.instrument_app(app)
+        logger.info("FastAPI instrumented with OpenTelemetry")
+    except Exception as e:
+        logger.warning(f"Failed to instrument FastAPI: {e}")
 
-def create_span(name: str, attributes: dict = None):
+def instrument_redis():
+    """Instrument Redis with OpenTelemetry."""
+    try:
+        RedisInstrumentor().instrument()
+        logger.info("Redis instrumented with OpenTelemetry")
+    except Exception as e:
+        logger.warning(f"Failed to instrument Redis: {e}")
+
+def instrument_sqlalchemy():
+    """Instrument SQLAlchemy with OpenTelemetry."""
+    try:
+        SQLAlchemyInstrumentor().instrument()
+        logger.info("SQLAlchemy instrumented with OpenTelemetry")
+    except Exception as e:
+        logger.warning(f"Failed to instrument SQLAlchemy: {e}")
+
+def instrument_logging():
+    """Instrument logging with OpenTelemetry."""
+    try:
+        LoggingInstrumentor().instrument()
+        logger.info("Logging instrumented with OpenTelemetry")
+    except Exception as e:
+        logger.warning(f"Failed to instrument logging: {e}")
+
+def get_tracer():
+    """Get the global tracer."""
+    return trace.get_tracer(__name__)
+
+def create_span(name: str, attributes: Optional[dict] = None):
     """Create a span with given name and attributes."""
-    if attributes is None:
-        attributes = {}
-    
-    with tracer.start_as_current_span(name, attributes=attributes) as span:
+    tracer = get_tracer()
+    with tracer.start_as_current_span(name, attributes=attributes or {}) as span:
         return span
 
+# Middleware for request metrics
+async def metrics_middleware(request: Request, call_next):
+    """Middleware to collect request metrics."""
+    start_time = time.time()
+    
+    # Extract tenant from request (if available)
+    tenant = "unknown"
+    try:
+        # Try to get tenant from various sources
+        if hasattr(request.state, "user") and request.state.user:
+            tenant = request.state.user.get("tenant_id", "unknown")
+        elif "x-tenant-id" in request.headers:
+            tenant = request.headers["x-tenant-id"]
+    except Exception:
+        tenant = "unknown"
+    
+    # Extract route and method
+    route = request.url.path
+    method = request.method
+    
+    # Increment query counter
+    TENANT_QUERIES.labels(tenant=tenant, route=route, method=method).inc()
+    
+    # Process request
+    response = await call_next(request)
+    
+    # Calculate latency
+    latency = time.time() - start_time
+    
+    # Record latency histogram
+    QUERY_LATENCY.labels(route=route, tenant=tenant, method=method).observe(latency)
+    
+    return response
 
-def add_event_to_span(span, name: str, attributes: dict = None):
-    """Add event to current span."""
-    if attributes is None:
-        attributes = {}
-    
-    span.add_event(name, attributes)
+def get_metrics():
+    """Get Prometheus metrics."""
+    return FastAPIResponse(
+        content=generate_latest(),
+        media_type=CONTENT_TYPE_LATEST
+    )
 
+def record_redis_failure(tenant: str, topic: str):
+    """Record Redis publish failure."""
+    REDIS_PUBLISH_FAILURES.labels(tenant=tenant, topic=topic).inc()
 
-def set_span_attribute(span, key: str, value):
-    """Set attribute on current span."""
-    span.set_attribute(key, value)
+def record_ingest_job(tenant: str, status: str, job_type: str):
+    """Record ingest job metric."""
+    INGEST_JOBS.labels(tenant=tenant, status=status, type=job_type).inc()
 
-
-# Context managers for common operations
-class LLMSpan:
-    """Context manager for LLM operations."""
-    
-    def __init__(self, provider: str, model: str, query: str):
-        self.provider = provider
-        self.model = model
-        self.query = query
-        self.span = None
-    
-    def __enter__(self):
-        self.span = create_span(
-            "llm.generate",
-            {
-                "llm.provider": self.provider,
-                "llm.model": self.model,
-                "llm.query_length": len(self.query)
-            }
-        )
-        return self.span
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.span:
-            self.span.end()
-
-
-class EmbeddingSpan:
-    """Context manager for embedding operations."""
-    
-    def __init__(self, provider: str, text_count: int):
-        self.provider = provider
-        self.text_count = text_count
-        self.span = None
-    
-    def __enter__(self):
-        self.span = create_span(
-            "embedding.generate",
-            {
-                "embedding.provider": self.provider,
-                "embedding.text_count": self.text_count
-            }
-        )
-        return self.span
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.span:
-            self.span.end()
-
-
-class SearchSpan:
-    """Context manager for search operations."""
-    
-    def __init__(self, query: str, top_k: int):
-        self.query = query
-        self.top_k = top_k
-        self.span = None
-    
-    def __enter__(self):
-        self.span = create_span(
-            "vector.search",
-            {
-                "search.query_length": len(self.query),
-                "search.top_k": self.top_k
-            }
-        )
-        return self.span
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.span:
-            self.span.end()
-
-
-class JobSpan:
-    """Context manager for job operations."""
-    
-    def __init__(self, job_type: str, job_id: int, document_id: int):
-        self.job_type = job_type
-        self.job_id = job_id
-        self.document_id = document_id
-        self.span = None
-    
-    def __enter__(self):
-        self.span = create_span(
-            f"job.{self.job_type}",
-            {
-                "job.id": self.job_id,
-                "job.type": self.job_type,
-                "job.document_id": self.document_id
-            }
-        )
-        return self.span
-    
-    def __exit__(self, exc_type, exc_val, exc_tb):
-        if self.span:
-            self.span.end()
+def update_queue_length(queue_name: str, length: int):
+    """Update queue length metric."""
+    QUEUE_LENGTH.labels(queue_name=queue_name).set(length)
