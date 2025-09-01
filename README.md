@@ -1,562 +1,247 @@
-# PromoAI RAG
+# PromoAI RAG System
 
-Каркас mini-SaaS для RAG (Retrieval-Augmented Generation) системы.
+Полноценная система RAG (Retrieval-Augmented Generation) для интеллектуального поиска и анализа документов с объединенным фронтендом и бэкендом.
 
-## Быстрый старт
+## 🚀 Быстрый старт
 
-### 1. Настройка окружения
+### Предварительные требования
 
+- Python 3.9+
+- Node.js 18+
+- PostgreSQL 16+ с расширением pgvector
+- Redis 7+
+- Docker и Docker Compose
+
+### Запуск всей системы
+
+1. **Клонируйте репозиторий:**
 ```bash
-# Скопировать пример конфигурации
-cp .env.example .env
-
-# Установить pre-commit hooks
-pre-commit install
+git clone <repository-url>
+cd rag
 ```
 
-### 2. Запуск полного стека
-
+2. **Запустите бэкенд и базы данных:**
 ```bash
-# Запустить все сервисы (db, redis, minio, worker, api)
-docker compose -f infra/docker-compose.yml up -d db redis minio worker api
+# Запуск PostgreSQL, Redis и API
+make up
 
-# Или через Makefile
-make dev-up
+# Или вручную:
+docker-compose up -d postgres redis
+cd api && python -m uvicorn main:app --reload --host 0.0.0.0 --port 8000
 ```
 
-### 3. Инициализация базы данных
-
+3. **Запустите Celery workers:**
 ```bash
-# Применить миграции
-alembic upgrade head
+cd workers && celery -A app worker --loglevel=info
 ```
 
-### 4. Проверка работоспособности
-
+4. **Запустите фронтенд:**
 ```bash
-# Проверка здоровья API
-curl http://localhost:8000/healthz
-
-# Загрузка PDF документа
-curl -F file=@tests/fixtures/simple.pdf http://localhost:8000/ingest
-
-# Проверка статуса job (замените {job_id} на полученный ID)
-curl http://localhost:8000/ingest/{job_id}
-
-# Поиск по документам
-curl -X POST http://localhost:8000/query \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "ваш поисковый запрос",
-    "top_k": 10,
-    "rerank": false,
-    "max_ctx": 1800
-  }'
-
-# Пример ответа:
-# {
-#   "matches": [
-#     {
-#       "doc_id": 1,
-#       "chunk_id": 5,
-#       "page": 2,
-#       "score": 0.85,
-#       "snippet": "Найденный текст...",
-#       "breadcrumbs": ["Глава 1", "Раздел 2"]
-#     }
-#   ],
-#   "usage": {
-#     "in_tokens": 5,
-#     "out_tokens": 150
-#   }
-# }
+cd web
+npm install
+npm run dev
 ```
 
-### 5. Остановка сервисов
+5. **Откройте в браузере:**
+- Фронтенд: http://localhost:3000
+- API: http://localhost:8000
+- API Docs: http://localhost:8000/docs
 
-```bash
-# Остановить все сервисы
-make dev-down
+## 🏗️ Архитектура
+
+### Бэкенд (Python/FastAPI)
+
+- **API**: FastAPI с аутентификацией JWT
+- **База данных**: PostgreSQL + pgvector для векторного поиска
+- **Очереди**: Celery + Redis для асинхронной обработки
+- **Векторные эмбеддинги**: OpenAI/Anthropic API
+- **WebSocket**: Real-time обновления статуса задач
+
+### Фронтенд (React/TypeScript)
+
+- **Фреймворк**: React 18 + TypeScript
+- **Сборщик**: Vite
+- **Стили**: Tailwind CSS с OKLCH цветовой палитрой
+- **Роутинг**: React Router
+- **Анимации**: Framer Motion
+- **Состояние**: React Context + Hooks
+
+### Компоненты системы
+
+```
+├── api/                 # FastAPI бэкенд
+│   ├── routers/        # API роутеры
+│   ├── models.py       # Pydantic модели
+│   ├── websocket.py    # WebSocket обработчики
+│   └── tracing.py      # OpenTelemetry + Prometheus
+├── workers/            # Celery workers
+│   ├── app.py         # Celery приложение
+│   └── tracing.py     # Worker метрики
+├── web/               # React фронтенд
+│   ├── src/pages/     # Страницы приложения
+│   ├── src/components/# UI компоненты
+│   └── src/services/  # API клиенты
+├── services/          # Бизнес-логика
+├── infra/            # Docker конфигурации
+└── docs/             # Документация
 ```
 
-## Архитектура
-
-### Компоненты
-
-- **API**: FastAPI с эндпоинтами для загрузки и поиска
-- **Worker**: Celery для асинхронной обработки документов
-- **Storage**: S3-совместимое хранилище (MinIO локально, R2 в продакшене)
-- **Database**: PostgreSQL с pgvector для векторного поиска
-- **Cache**: Redis для очередей и кэширования
-
-### Пайплайн обработки
-
-1. **Upload**: Файл загружается в S3
-2. **Parse**: Документ разбивается на элементы (текст, заголовки, таблицы)
-3. **Chunk**: Элементы разбиваются на чанки с метаданными
-4. **Index**: Чанки индексируются для поиска
-5. **Query**: Векторный поиск с опциональным reranking
-
-### Realtime Status
-
-WebSocket endpoint для real-time статуса jobs: `/ws/jobs`
-
-**Архитектура:**
-- Workers публикуют события в Redis Pub/Sub
-- API WebSocket подписывается на Redis каналы
-- Клиенты получают события через WebSocket
-
-**Формат событий:**
-```json
-{
-  "event": "parse_started|parse_done|parse_failed",
-  "job_id": 123,
-  "document_id": 456,
-  "type": "parse",
-  "progress": 0-100,
-  "tenant_id": "tenant123",
-  "ts": "2024-01-01T00:00:00Z"
-}
-```
-
-**Обязательные переменные окружения:**
-- `REDIS_URL` - URL для Redis (по умолчанию: `redis://localhost:6379`)
-- `REQUIRE_AUTH=true` - требовать аутентификацию для WebSocket
-- `NEXTAUTH_SECRET` - секрет для JWT токенов
-
-### Observability & Monitoring
-
-Система оснащена полноценным стеком наблюдаемости для production-ready мониторинга:
-
-#### OpenTelemetry Tracing
-
-**Сквозная трассировка** через все компоненты:
-- **Cloudflare Workers** → генерируют traceId
-- **FastAPI API** → создает spans для API calls
-- **Celery Workers** → создают spans для task execution
-- **Redis** → инструментируется для показа операций
-
-**Конфигурация:**
-```bash
-export OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317
-export OTEL_SERVICE_NAME=api  # или 'worker' для workers
-export OTEL_TRACES_SAMPLER=parentbased_traceidratio
-export OTEL_TRACES_SAMPLER_ARG=1.0
-```
-
-#### Prometheus Metrics
-
-**API метрики:**
-- `query_latency_seconds{route,tenant,method}` - histogram с P50/P95/P99
-- `tenant_queries_total{tenant,route,method}` - counter количества запросов
-- `redis_publish_failures_total{tenant,topic}` - counter неудачных публикаций
-
-**Worker метрики:**
-- `ingest_job_duration_seconds{tenant,job_type,status}` - histogram по этапам ingestion
-- `embedding_duration_seconds{tenant,model,text_count}` - histogram для embeddings
-- `queue_length{queue_name}` - gauge длины очереди
-
-#### Grafana Dashboards
-
-**Доступные дашборды:**
-- **API Overview** - основные метрики API, latency, error rates
-- **Workers Overview** - производительность workers, queue length, job duration
-
-**Алёрты:**
-- P95 query_latency_seconds > 2.5s на протяжении 5 минут
-- Доля 5xx ошибок > 1% за 5 минут
-- redis_publish_failures_total > 0 за минуту
-- queue_length > 100 jobs
-
-#### Запуск Observability Stack
-
-```bash
-# Запустить Jaeger, Prometheus, Grafana
-./scripts/start_observability.sh
-
-# Или вручную
-cd infra
-docker-compose -f observability.yml up -d
-```
-
-**Доступные сервисы:**
-- **Jaeger UI**: http://localhost:16686 - просмотр трасс
-- **Prometheus**: http://localhost:9090 - метрики и алёрты
-- **Grafana**: http://localhost:3000 (admin/admin) - дашборды
-- **Redis Monitor**: localhost:6380 - мониторинг Redis
-
-#### Тестирование Observability
-
-```bash
-# Запустить API с tracing
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 OTEL_SERVICE_NAME=api uvicorn api.main:app --reload
-
-# Запустить worker с tracing
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4317 OTEL_SERVICE_NAME=worker celery -A workers.app worker --loglevel=info
-
-# Запустить тесты
-pytest tests/test_otel_integration.py
-```
-
-```bash
-# Подключение к WebSocket
-ws://localhost:8000/ws/jobs
-
-# Формат событий:
-{
-  "event": "parse_started|parse_progress|parse_done|parse_failed",
-  "job_id": 123,
-  "document_id": 456,
-  "type": "parse|chunk|embed",
-  "progress": 50,
-  "tenant_id": "tenant123",
-  "ts": "2024-01-01T00:00:00Z"
-}
-```
-
-**Архитектура:**
-- Workers публикуют события в Redis каналы `{tenant_id}.jobs`
-- WebSocket API подписывается на Redis и ретранслирует события клиентам
-- Изолированные каналы для каждого tenant обеспечивают безопасность
-
-**Обязательные переменные окружения:**
-- `REDIS_URL` - URL для подключения к Redis (по умолчанию: `redis://localhost:6379`)
-- `REQUIRE_AUTH=true` - требовать аутентификацию для WebSocket
-- `NEXTAUTH_SECRET` - секрет для JWT токенов
-
-**Роли и токены для тестирования:**
-- `admin` - полный доступ ко всем операциям
-- `user` - базовый доступ к загрузке и поиску
-- `viewer` - только чтение документов
-
-### Query API
-
-- **POST `/query`**: Поиск по документам
-- **Embeddings**: BGE-M3 (1024-dimensional)
-- **Index**: PostgreSQL + pgvector
-- **Reranking**: Опционально через Workers AI
-
-#### Переменные окружения
-
-```bash
-# Embeddings
-EMBED_PROVIDER=local                    # local или workers_ai
-EMBED_BATCH_SIZE=64                     # Размер батча
-
-# Workers AI (опционально)
-WORKERS_AI_TOKEN=your_token_here        # API токен
-WORKERS_AI_URL=https://api.cloudflare.com/client/v4/ai/run/@cf/baai/bge-m3
-MODEL_ID=@cf/baai/bge-m3
-
-# Vector Search
-TOP_K=100                               # Количество результатов поиска
-RERANK_ENABLED=false                    # Включить reranking
-MAX_CTX_TOKENS=1800                     # Максимальный размер контекста
-
-# pgvector Tuning
-IVFFLAT_LISTS=100                       # Количество списков в ivfflat индексе
-IVFFLAT_PROBES=10                       # Количество проб для поиска (10-20)
-
-# Admin API (опционально)
-ADMIN_API_ENABLED=false                 # Включить админ API
-ADMIN_API_TOKEN=your_admin_token        # Токен для админ API
-
-# LLM Provider
-LLM_PROVIDER=gemini                     # Провайдер LLM (gemini)
-LLM_MODEL=gemini-2.5-flash              # Модель LLM
-GEMINI_API_KEY=your_gemini_api_key      # API ключ для Google AI Studio
-LLM_TIMEOUT=30                          # Таймаут LLM запросов (сек)
-LLM_MAX_TOKENS=1024                     # Максимум токенов для генерации
-LLM_TEMPERATURE=0.2                     # Температура генерации (0.0-1.0)
-
-# Answer Cache
-ANSWER_CACHE_TTL=300                    # TTL кэша ответов (сек)
-
-# Content Filter (опционально)
-ANSWER_CONTENT_FILTER=false             # Включить фильтр контента
-
-# Frontend CORS
-FRONTEND_ORIGINS=http://localhost:3000  # Разрешённые домены для CORS (через запятую)
-
-# Authentication
-REQUIRE_AUTH=true                        # Требовать аутентификацию для всех endpoints
-NEXTAUTH_SECRET=your-secret-key          # Секрет для JWT токенов (общий с фронтом)
-
-# Rate Limiting
-RATE_LIMIT_PER_MIN=60                    # Лимит запросов в минуту на пользователя/ключ
-DAILY_TOKEN_QUOTA=200000                 # Дневная квота токенов на tenant
-```
-
-#### Примеры использования
-
-```bash
-# Поиск с настройками
-curl -X POST http://localhost:8000/query \
-  -H "Content-Type: application/json" \
-  -d '{
-    "query": "как работает система",
-    "top_k": 20,
-    "rerank": false,
-    "max_ctx": 1800
-  }'
-
-# Оптимизация поиска (для больших индексов)
-# Увеличить ivfflat.probes для лучшего качества:
-# SET ivfflat.probes = 20;
-```
-
-## How to check status
-
-### Document Status
-
-Для получения статуса документа со всеми jobs:
-
-```bash
-# Получить статус документа
-curl http://localhost:8000/ingest/document/{document_id}
-
-# Пример ответа:
-{
-  "document_id": 1,
-  "status": "done",
-  "jobs": [
-    {
-      "id": 1,
-      "type": "parse",
-      "status": "done",
-      "progress": 100,
-      "document_id": 1,
-      "created_at": "2024-01-01T10:00:00",
-      "updated_at": "2024-01-01T10:01:00"
-    },
-    {
-      "id": 2,
-      "type": "chunk",
-      "status": "done", 
-      "progress": 100,
-      "document_id": 1,
-      "created_at": "2024-01-01T10:01:00",
-      "updated_at": "2024-01-01T10:02:00"
-    },
-    {
-      "id": 3,
-      "type": "embed",
-      "status": "done",
-      "progress": 100,
-      "document_id": 1,
-      "created_at": "2024-01-01T10:02:00",
-      "updated_at": "2024-01-01T10:03:00"
-    }
-  ]
-}
-```
-
-### Job Status
-
-Для получения статуса конкретного job:
-
-```bash
-curl http://localhost:8000/ingest/{job_id}
-```
-
-## How to tune vector search
-
-### pgvector Parameters
-
-- **IVFFLAT_LISTS**: Количество списков в ivfflat индексе (по умолчанию 100)
-  - Больше списков = лучше качество, медленнее поиск
-  - Меньше списков = быстрее поиск, хуже качество
-
-- **IVFFLAT_PROBES**: Количество проб для поиска (по умолчанию 10)
-  - Больше проб = лучше качество, медленнее поиск
-  - Рекомендуется 10-20 для большинства случаев
-  - Для больших индексов можно увеличить до 50-100
-
-### Tuning Guidelines
-
-```bash
-# Для высокого качества (медленнее)
-IVFFLAT_PROBES=20
-
-# Для высокой скорости (хуже качество)
-IVFFLAT_PROBES=5
-
-# Для больших индексов (>1M векторов)
-IVFFLAT_LISTS=1000
-IVFFLAT_PROBES=50
-```
-
-## Answer API
-
-### Generate Answer
-
-```bash
-# Синхронный ответ
-curl -X POST http://localhost:8000/answer \
-  -H "Content-Type: application/json" \
-  -H "X-Tenant-ID: your_tenant" \
-  -d '{
-    "query": "Что такое RAG?",
-    "top_k": 10,
-    "rerank": false,
-    "max_ctx": 2000,
-    "temperature": 0.2,
-    "max_tokens": 1024
-  }'
-
-# Пример ответа:
-{
-  "answer": "RAG (Retrieval-Augmented Generation) - это подход, который сочетает поиск информации с генерацией ответов...",
-  "citations": [
-    {
-      "doc_id": 1,
-      "chunk_id": 5,
-      "page": 2,
-      "score": 0.85
-    }
-  ],
-  "usage": {
-    "in_tokens": 150,
-    "out_tokens": 200,
-    "latency_ms": 1200,
-    "provider": "gemini",
-    "model": "gemini-2.5-flash",
-    "cost_usd": null
-  }
-}
-```
-
-### Streaming Answer
-
-```bash
-# Потоковый ответ (SSE)
-curl -X POST http://localhost:8000/answer/stream \
-  -H "Content-Type: application/json" \
-  -H "Accept: text/event-stream" \
-  -d '{
-    "query": "Как работает система?",
-    "top_k": 10,
-    "rerank": false
-  }'
-
-# Ответ приходит по частям:
-# event: chunk
-# data: {"text": "Система работает следующим образом..."}
-# 
-# event: chunk
-# data: {"text": "Она использует RAG для..."}
-# 
-# event: done
-# data: {"citations": [...], "usage": {...}}
-```
-
-## CORS и SSE
-
-### Настройка CORS
-Система поддерживает CORS для фронтенда. Настройте `FRONTEND_ORIGINS` в `.env`:
-
-```bash
-# Для одного домена
-FRONTEND_ORIGINS=http://localhost:3000
-
-# Для нескольких доменов
-FRONTEND_ORIGINS=http://localhost:3000,https://yourdomain.com
-```
-
-### Server-Sent Events (SSE)
-Эндпоинт `/answer/stream` использует SSE для потоковой передачи ответов.
-
-**Важно для продакшена:**
-- Отключите буферизацию в nginx: `proxy_buffering off;`
-- Или используйте заголовок `X-Accel-Buffering: no` (уже добавлен)
-
-### Требования для LLM
-Для работы `/answer` и `/answer/stream` требуется:
-- `GEMINI_API_KEY` - API ключ Google AI Studio
-- `LLM_PROVIDER=gemini` - провайдер LLM
-
-**⚠️ Безопасность:** API ключ хранится только в `.env` и не коммитится в репозиторий.
-```
-
-## Разработка
-
-### Установка зависимостей
-
-```bash
-pip install -r requirements.txt
-```
-
-### Тестирование
-
+## 🔌 API Endpoints
+
+### Аутентификация
+- `POST /auth/login` - Вход в систему
+- `POST /auth/register` - Регистрация
+- `GET /auth/profile` - Профиль пользователя
+
+### Документы
+- `GET /documents` - Список документов
+- `POST /ingest` - Загрузка документа
+- `GET /documents/{id}` - Получение документа
+
+### Поиск
+- `POST /query` - AI поиск по документам
+- `GET /ws/jobs` - WebSocket для статуса задач
+
+### Администрирование
+- `GET /usage` - Статистика использования
+- `GET /keys` - API ключи
+- `GET /metrics` - Prometheus метрики
+
+## 🎨 Фронтенд страницы
+
+### Публичные
+- **Landing** (`/`) - Маркетинговый лендинг с описанием возможностей
+- **Login** (`/login`) - Страница входа
+- **Register** (`/register`) - Страница регистрации
+
+### Защищенные (требуют авторизации)
+- **Dashboard** (`/dashboard`) - Главная страница с обзором
+- **Documents** (`/documents`) - Управление документами
+- **Search** (`/search`) - AI поиск по документам
+
+## 🚀 Возможности
+
+### Для пользователей
+- 📄 Загрузка документов (PDF, DOCX, XLSX, PPTX, TXT, HTML)
+- 🔍 AI поиск с цитатами и источниками
+- 📊 Отслеживание статуса обработки в реальном времени
+- 👥 Командная работа с документами
+- 🔐 Безопасная аутентификация и авторизация
+
+### Для разработчиков
+- 🏗️ Модульная архитектура с четким разделением ответственности
+- 📱 Адаптивный UI с современным дизайном
+- 🔌 REST API с OpenAPI документацией
+- 📡 WebSocket для real-time обновлений
+- 📊 OpenTelemetry + Prometheus для мониторинга
+
+## 🧪 Тестирование
+
+### Бэкенд тесты
 ```bash
 # Запуск всех тестов
 pytest
 
-# Запуск конкретного теста
-pytest tests/test_ingest_pipeline.py
+# Тесты с покрытием
+pytest --cov=api --cov=services --cov=workers
 
-# Проверка качества кода
-pre-commit run -a
+# E2E тесты
+pytest tests/test_integration.py
 ```
 
-### Миграции БД
-
+### Фронтенд тесты
 ```bash
-# Создать миграцию
-alembic revision --autogenerate -m "description"
-
-# Применить миграции
-alembic upgrade head
+cd web
+npm test              # Unit тесты
+npm run test:e2e      # E2E тесты
 ```
 
-## Конфигурация
+## 📊 Мониторинг
+
+### Метрики
+- Latency API запросов (P50, P95, P99)
+- Количество запросов по тенантам
+- Время обработки документов
+- Статус Redis и WebSocket соединений
+
+### Дашборды
+- Grafana дашборды для API и workers
+- Prometheus алерты для критических метрик
+- Jaeger для трассировки запросов
+
+## 🔧 Конфигурация
 
 ### Переменные окружения
 
-Скопируйте `.env.example` в `.env` и настройте:
-             
-             
-
+#### Бэкенд (.env)
 ```bash
-# База данных
-DATABASE_URL=postgresql+psycopg://postgres:postgres@localhost:5432/postgres
-
-# Redis
-REDIS_URL=redis://localhost:6379/0
-
-# S3/MinIO
-S3_ENDPOINT=http://localhost:9000
-S3_REGION=us-east-1
-S3_BUCKET=promoai
-S3_ACCESS_KEY_ID=minio
-S3_SECRET_ACCESS_KEY=minio123
-
-# JWT
-JWT_SECRET=your-secret-key
+DATABASE_URL=postgresql://user:pass@localhost:5432/promoai
+REDIS_URL=redis://localhost:6379
+OPENAI_API_KEY=your-openai-key
+ANTHROPIC_API_KEY=your-anthropic-key
 ```
 
-## Sprint 1: Ingest Pipeline
+#### Фронтенд (web/.env.local)
+```bash
+VITE_API_BASE_URL=http://localhost:8000
+VITE_WS_URL=ws://localhost:8000
+VITE_AUTH_ENABLED=true
+VITE_TENANT_ID=dev-tenant
+```
 
-Реализован полный пайплайн загрузки документов:
+## 🚀 Развертывание
 
-- ✅ POST `/ingest` - загрузка файлов
-- ✅ GET `/ingest/{job_id}` - статус обработки
-- ✅ Парсинг PDF (PyMuPDF4LLM) и Office (unstructured)
-- ✅ Извлечение таблиц (pdfplumber/camelot)
-- ✅ Чанкинг с метаданными (header-aware, token-aware)
-- ✅ Асинхронная обработка через Celery
-- ✅ S3-совместимое хранилище
+### Docker Compose
+```bash
+# Продакшн
+docker-compose -f infra/docker-compose.yml up -d
 
-### Поддерживаемые форматы
+# С observability stack
+docker-compose -f infra/observability.yml up -d
+```
 
-- **PDF**: application/pdf
-- **Word**: application/vnd.openxmlformats-officedocument.wordprocessingml.document
-- **Excel**: application/vnd.openxmlformats-officedocument.spreadsheetml.sheet
-- **CSV**: text/csv
-- **Markdown**: text/markdown
-- **HTML**: text/html
-- **Plain Text**: text/plain
+### Kubernetes
+```bash
+kubectl apply -f k8s/
+```
 
-## Лицензия
+## 📚 Документация
 
-MIT
+- [API Reference](http://localhost:8000/docs) - Swagger UI
+- [Architecture Decisions](docs/adr/) - ADR записи
+- [Engineering Log](docs/ENGINEERING_LOG.md) - Лог разработки
+- [Setup Instructions](SETUP_INSTRUCTIONS.md) - Детальные инструкции по установке
+
+## 🤝 Вклад в проект
+
+1. Создайте Issue с описанием проблемы/фичи
+2. Форкните репозиторий
+3. Создайте feature ветку: `git checkout -b feature/amazing-feature`
+4. Внесите изменения и закоммитьте: `git commit -m 'feat: add amazing feature'`
+5. Запушьте в форк: `git push origin feature/amazing-feature`
+6. Создайте Pull Request
+
+### Commit Convention
+Используем [Conventional Commits](https://www.conventionalcommits.org/):
+- `feat:` - новые возможности
+- `fix:` - исправления багов
+- `docs:` - документация
+- `style:` - форматирование кода
+- `refactor:` - рефакторинг
+- `test:` - тесты
+- `chore:` - обновления зависимостей
+
+## 📄 Лицензия
+
+MIT License - см. [LICENSE](LICENSE) файл для деталей.
+
+## 🆘 Поддержка
+
+- 📧 Email: support@promo.ai
+- 💬 Discord: [PromoAI Community](https://discord.gg/promoai)
+- 📖 Документация: [docs.promo.ai](https://docs.promo.ai)
+- 🐛 Bug Reports: [GitHub Issues](https://github.com/promoai/rag/issues)
+
+---
+
+**PromoAI RAG System** - Интеллектуальный поиск по документам с AI 🚀
