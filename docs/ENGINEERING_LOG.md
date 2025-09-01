@@ -49,6 +49,14 @@
 - Эффект/риски: + Продакшен-готовый Sprint 2. + Стабильный e2e пайплайн. + Правильные метрики прогресса. + Безопасность админ API. - Сложность отладки без админ роутов.
 - Следующие шаги: Sprint 3 - LLM слой с провайдерами, prompt engineering, streaming responses
 
+## 2025-01-27 (Sprint 4 - WebSocket Decoupling)
+- Дата: 2025-01-27
+- Что сделано: S4-1 WebSocket развязка через Redis Pub/Sub. Создан Event Bus, workers используют publish_event вместо API импортов, WebSocket API подписывается на Redis каналы, реальные e2e тесты.
+- Почему так: Workers напрямую импортировали API создавая циклические зависимости. Redis Pub/Sub выбран за простоту, надежность и real-time доставку событий.
+- Как работает: services/events/bus.py с publish_event/subscribe_loop, workers публикуют в {tenant_id}.jobs, WebSocket подписывается и ретранслирует клиентам, ping/pong + авто-reconnect.
+- Эффект/риски: + Развязка workers и API. + Упрощение тестирования. + Масштабируемость WebSocket. + Real-time статус. - Зависимость от Redis. - Сложность отладки через Redis.
+- Следующие шаги: S4-2 - WebSocket клиент, real-time UI, job monitoring dashboard
+
 Шаблон записи:
 - Дата:
 - Что сделано:

@@ -1,0 +1,72 @@
+name: WebSocket E2E Tests
+
+on:
+  push:
+    branches: [ main, develop ]
+    paths: [ 'services/events/**', 'api/websocket.py', 'workers/tasks/**', 'tests/test_websocket_e2e.py' ]
+  pull_request:
+    branches: [ main, develop ]
+    paths: [ 'services/events/**', 'api/websocket.py', 'workers/tasks/**', 'tests/test_websocket_e2e.py' ]
+
+jobs:
+  websocket-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    
+    services:
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+      
+      postgres:
+        image: postgres:15
+        env:
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: test_db
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio websockets httpx
+    
+    - name: Wait for services
+      run: |
+        echo "Waiting for Redis..."
+        timeout 30 bash -c 'until redis-cli -h localhost ping; do sleep 1; done'
+        echo "Waiting for PostgreSQL..."
+        timeout 30 bash -c 'until pg_isready -h localhost -p 5432; do sleep 1; done'
+    
+    - name: Run WebSocket E2E tests
+      env:
+        REDIS_URL: redis://localhost:6379
+        DATABASE_URL: postgresql://postgres:postgres@localhost:5432/test_db
+        REQUIRE_AUTH: false
+      run: |
+        python -m pytest tests/test_websocket_e2e.py -v --tb=short --timeout=20
+    
+    - name: Run acceptance script
+      run: |
+        chmod +x scripts/accept_s4_ws.sh
+        ./scripts/accept_s4_ws.sh

@@ -97,6 +97,36 @@ make dev-down
 4. **Index**: Чанки индексируются для поиска
 5. **Query**: Векторный поиск с опциональным reranking
 
+### Realtime Status
+
+WebSocket endpoint для получения статуса обработки документов в реальном времени:
+
+```bash
+# Подключение к WebSocket
+ws://localhost:8000/ws/jobs
+
+# Формат событий:
+{
+  "event": "parse_started|parse_progress|parse_done|parse_failed",
+  "job_id": 123,
+  "document_id": 456,
+  "type": "parse|chunk|embed",
+  "progress": 50,
+  "tenant_id": "tenant123",
+  "ts": "2024-01-01T00:00:00Z"
+}
+```
+
+**Переменные окружения:**
+- `REDIS_URL` - URL для подключения к Redis (по умолчанию: `redis://localhost:6379`)
+- `REQUIRE_AUTH=true` - требовать аутентификацию для WebSocket
+- `NEXTAUTH_SECRET` - секрет для JWT токенов
+
+**Роли и токены для тестирования:**
+- `admin` - полный доступ ко всем операциям
+- `user` - базовый доступ к загрузке и поиску
+- `viewer` - только чтение документов
+
 ### Query API
 
 - **POST `/query`**: Поиск по документам

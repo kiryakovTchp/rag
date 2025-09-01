@@ -50,14 +50,17 @@ class PGVectorIndex:
                 provider = EXCLUDED.provider,
                 updated_at = NOW()
             """
-            
+
             for chunk_id, vector in zip(chunk_ids, vectors):
                 # pgvector adapter will handle numpy array conversion directly
-                db.execute(text(sql), {
-                    "chunk_id": chunk_id,
-                    "vector": vector,  # numpy array passed directly
-                    "provider": provider
-                })
+                db.execute(
+                    text(sql),
+                    {
+                        "chunk_id": chunk_id,
+                        "vector": vector,  # numpy array passed directly
+                        "provider": provider,
+                    },
+                )
 
             db.commit()
         finally:
@@ -74,10 +77,10 @@ class PGVectorIndex:
             List of (chunk_id, score) tuples sorted by score DESC
         """
         import os
-        
+
         # Ensure query vector is float32
         query_vector = query_vector.astype(np.float32)
-        
+
         # Get probes from environment
         probes = int(os.getenv("IVFFLAT_PROBES", "10"))
 
@@ -92,11 +95,9 @@ class PGVectorIndex:
         """
 
         with engine.connect() as conn:
-            result = conn.execute(text(sql), {
-                "query_vector": query_vector, 
-                "top_k": top_k,
-                "probes": probes
-            })
+            result = conn.execute(
+                text(sql), {"query_vector": query_vector, "top_k": top_k, "probes": probes}
+            )
 
             results = []
             for row in result:

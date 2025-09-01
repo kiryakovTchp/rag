@@ -1,13 +1,11 @@
-import logging
 import asyncio
+import logging
 
 from db.models import Chunk, Document, Element, Job
 from db.session import SessionLocal
 from services.chunking.pipeline import ChunkingPipeline
+from services.events.bus import publish_event
 from workers.app import celery_app
-from workers.tasks.index import index_document_embeddings
-from api.websocket import emit_job_event_sync
-from services.job_manager import job_manager
 
 logger = logging.getLogger(__name__)
 
@@ -33,10 +31,20 @@ def chunk_document(self, document_id: int, tenant_id: str = None) -> dict:
             job.progress = 70
             db.commit()
             logger.info(f"Updated job {job.id} status to running, progress: 70%")
-            
+
             # Emit WebSocket event
             if tenant_id:
-                asyncio.create_task(job_manager.job_started(job.id, tenant_id, document_id, "chunk"))
+                asyncio.create_task(
+                    publish_event(
+                        f"{tenant_id}.jobs",
+                        {
+                            "event": "job_started",
+                            "job_id": job.id,
+                            "document_id": document_id,
+                            "type": "chunk",
+                        },
+                    )
+                )
 
         # Get all elements for this document
         elements = db.query(Element).filter(Element.document_id == document_id).all()
@@ -67,10 +75,21 @@ def chunk_document(self, document_id: int, tenant_id: str = None) -> dict:
             job.progress = 85
             db.commit()
             logger.info(f"Updated job {job.id} progress: 85%")
-            
+
             # Emit WebSocket event
             if tenant_id:
-                asyncio.create_task(job_manager.job_progress(job.id, 85, tenant_id, document_id, "chunk"))
+                asyncio.create_task(
+                    publish_event(
+                        f"{tenant_id}.jobs",
+                        {
+                            "event": "job_progress",
+                            "job_id": job.id,
+                            "document_id": document_id,
+                            "type": "chunk",
+                            "progress": 85,
+                        },
+                    )
+                )
 
         # Save chunks to database
         logger.info("Saving chunks to database...")
@@ -101,19 +120,25 @@ def chunk_document(self, document_id: int, tenant_id: str = None) -> dict:
             job.progress = 100
             db.commit()
             logger.info(f"Updated job {job.id} status to done, progress: 100%")
-            
+
             # Emit WebSocket event
             if tenant_id:
-                asyncio.create_task(job_manager.job_done(job.id, tenant_id, document_id, "chunk"))
+                asyncio.create_task(
+                    publish_event(
+                        f"{tenant_id}.jobs",
+                        {
+                            "event": "chunk_done",
+                            "job_id": job.id,
+                            "document_id": document_id,
+                            "type": "chunk",
+                            "progress": 100,
+                        },
+                    )
+                )
 
         # Create embed job and trigger embedding task
         logger.info(f"Creating embed job for document {document_id}")
-        embed_job = Job(
-            type="embed",
-            status="queued",
-            progress=0,
-            document_id=document_id
-        )
+        embed_job = Job(type="embed", status="queued", progress=0, document_id=document_id)
         db.add(embed_job)
         db.commit()
         logger.info(f"Created embed job {embed_job.id}")
@@ -121,6 +146,7 @@ def chunk_document(self, document_id: int, tenant_id: str = None) -> dict:
         # Trigger embedding task
         logger.info(f"Triggering embed task for document {document_id}")
         from workers.tasks.embed import embed_document
+
         embed_document.apply_async(args=[document_id, tenant_id], queue="embed")
 
         return {
@@ -137,10 +163,21 @@ def chunk_document(self, document_id: int, tenant_id: str = None) -> dict:
             job.error = str(e)
             db.commit()
             logger.error(f"Updated job {job.id} status to error: {e}")
-            
+
             # Emit WebSocket event
             if tenant_id:
-                asyncio.create_task(job_manager.job_failed(job.id, str(e), tenant_id, document_id, "chunk"))
+                asyncio.create_task(
+                    publish_event(
+                        f"{tenant_id}.jobs",
+                        {
+                            "event": "chunk_failed",
+                            "job_id": job.id,
+                            "document_id": document_id,
+                            "type": "chunk",
+                            "error": str(e),
+                        },
+                    )
+                )
         raise
     finally:
         db.close()
