@@ -1,5 +1,5 @@
-import asyncio
 import logging
+from typing import Optional
 
 from db.models import Chunk, Document, Element, Job
 from db.session import SessionLocal
@@ -11,7 +11,7 @@ logger = logging.getLogger(__name__)
 
 
 @celery_app.task(bind=True, queue="chunk")
-def chunk_document(self, document_id: int, tenant_id: str = None) -> dict:
+def chunk_document(self, document_id: int, tenant_id: Optional[str] = None) -> dict:
     """Chunk document elements into searchable chunks."""
     logger.info(f"Starting chunk task for document {document_id}")
     db = SessionLocal()
@@ -25,7 +25,11 @@ def chunk_document(self, document_id: int, tenant_id: str = None) -> dict:
         logger.info(f"Chunking document: {document.name}")
 
         # Get chunk job
-        job = db.query(Job).filter(Job.document_id == document_id, Job.type == "chunk").first()
+        job = (
+            db.query(Job)
+            .filter(Job.document_id == document_id, Job.type == "chunk")
+            .first()
+        )
         if job:
             job.status = "running"
             job.progress = 70
@@ -132,7 +136,9 @@ def chunk_document(self, document_id: int, tenant_id: str = None) -> dict:
 
         # Create embed job and trigger embedding task
         logger.info(f"Creating embed job for document {document_id}")
-        embed_job = Job(type="embed", status="queued", progress=0, document_id=document_id)
+        embed_job = Job(
+            type="embed", status="queued", progress=0, document_id=document_id
+        )
         db.add(embed_job)
         db.commit()
         logger.info(f"Created embed job {embed_job.id}")

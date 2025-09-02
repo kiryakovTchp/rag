@@ -18,6 +18,7 @@ COPY api/ /app/api/
 COPY services/ /app/services/
 COPY db/ /app/db/
 COPY storage/ /app/storage/
+COPY workers/ /app/workers/
 
 # Устанавливаем рабочую директорию
 WORKDIR /app

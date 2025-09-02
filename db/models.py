@@ -1,12 +1,20 @@
-from datetime import datetime
-import uuid
-
-from sqlalchemy import JSON, Column, DateTime, ForeignKey, Integer, String, Text, func, text, Enum, ARRAY
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
-
 # Import pgvector Vector type
 from pgvector.sqlalchemy import Vector
+from sqlalchemy import (
+    ARRAY,
+    JSON,
+    Column,
+    DateTime,
+    Enum,
+    ForeignKey,
+    Integer,
+    String,
+    Text,
+    func,
+    text,
+)
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy.orm import relationship
 
 Base = declarative_base()
 
@@ -77,11 +85,12 @@ class Chunk(Base):
     element = relationship("Element", back_populates="chunks")
 
 
-
 class Embedding(Base):
     __tablename__ = "embeddings"
 
-    chunk_id = Column(Integer, ForeignKey("chunks.id", ondelete="CASCADE"), primary_key=True)
+    chunk_id = Column(
+        Integer, ForeignKey("chunks.id", ondelete="CASCADE"), primary_key=True
+    )
     vector = Column(Vector(1024), nullable=False, index=False)  # pgvector vector(1024)
     provider = Column(String(50), nullable=False)  # local, workers_ai
     created_at = Column(DateTime(timezone=True), default=func.now())
@@ -93,11 +102,14 @@ class Embedding(Base):
 class User(Base):
     __tablename__ = "users"
 
-    id = Column(String(100), primary_key=True, index=True)
-    tenant_id = Column(String(100), nullable=False, index=True)
-    email = Column(String(255), nullable=False)
+    id = Column(Integer, primary_key=True, index=True)
+    email = Column(String(255), nullable=False, unique=True, index=True)
+    password_hash = Column(String(255), nullable=False)
+    tenant_id = Column(String(100), nullable=True, index=True)
     role = Column(String(50), default="user")
-    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=text("now()"), nullable=False
+    )
 
 
 class AnswerLog(Base):
@@ -122,13 +134,16 @@ class APIKey(Base):
     key_hash = Column(String(255), nullable=False, unique=True, index=True)
     tenant_id = Column(String(100), nullable=False, index=True)
     role = Column(String(50), nullable=False, server_default="user")
-    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    created_at = Column(
+        DateTime(timezone=True), server_default=text("now()"), nullable=False
+    )
     revoked_at = Column(DateTime(timezone=True), nullable=True)
-    
+
     @staticmethod
     def hash_key(key: str) -> str:
         """Hash API key for storage."""
         import hashlib
+
         return hashlib.sha256(key.encode()).hexdigest()
 
 
@@ -139,7 +154,9 @@ class AnswerFeedback(Base):
     answer_id = Column(String(100), nullable=False, index=True)
     tenant_id = Column(String(100), nullable=False, index=True)
     user_id = Column(String(100), nullable=True, index=True)
-    rating = Column(Enum('up', 'down', name='feedback_rating'), nullable=False)
-    reason = Column(Text, nullable=True)
-    selected_citation_ids = Column(ARRAY(Integer), nullable=True)
-    created_at = Column(DateTime(timezone=True), server_default=text("now()"), nullable=False)
+    rating = Column(Enum("up", "down", name="feedback_rating"), nullable=False)  # type: ignore
+    reason = Column(Text, nullable=True)  # type: ignore
+    selected_citation_ids = Column(ARRAY(Integer), nullable=True)  # type: ignore
+    created_at = Column(
+        DateTime(timezone=True), server_default=text("now()"), nullable=False
+    )

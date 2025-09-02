@@ -1,8 +1,12 @@
 import os
 
 from celery import Celery
+
 # OpenTelemetry temporarily disabled for stability
-# from workers.tracing import setup_tracing, instrument_celery, instrument_redis, instrument_logging, TracedTask
+# from workers.tracing import (
+#     setup_tracing, instrument_celery, instrument_redis,
+#     instrument_logging, TracedTask
+# )
 
 # Configure Celery
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
@@ -11,7 +15,11 @@ celery_app = Celery(
     "promoai_rag",
     broker=REDIS_URL,
     backend=REDIS_URL,
-    include=["workers.tasks.parse", "workers.tasks.chunk", "workers.tasks.embed"],
+    include=[
+        "workers.tasks.parse",
+        "workers.tasks.chunk",
+        "workers.tasks.embed",
+    ],
 )
 
 # OpenTelemetry temporarily disabled for stability
@@ -32,6 +40,7 @@ celery_app.conf.update(
     task_soft_time_limit=25 * 60,  # 25 minutes
     worker_prefetch_multiplier=1,
     worker_max_tasks_per_child=1000,
+    broker_connection_retry_on_startup=True,
     # task_cls=TracedTask,  # OpenTelemetry temporarily disabled
 )
 

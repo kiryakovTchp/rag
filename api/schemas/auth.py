@@ -2,43 +2,62 @@
 
 from datetime import datetime
 from typing import Optional
-from pydantic import BaseModel
+
+from pydantic import BaseModel, EmailStr
 
 
+class UserRegister(BaseModel):
+    """User registration request."""
+
+    email: EmailStr
+    password: str
+
+
+class UserLogin(BaseModel):
+    """User login request."""
+
+    email: EmailStr
+    password: str
+
+
+class TokenResponse(BaseModel):
+    """JWT token response."""
+
+    access_token: str
+    token_type: str = "bearer"
+
+
+class UserInfo(BaseModel):
+    """User information response."""
+
+    id: int
+    email: str
+    tenant_id: Optional[str] = None
+    role: str
+    created_at: datetime
+
+
+# Existing API key schemas
 class APIKeyCreate(BaseModel):
-    """Schema for creating API key."""
+    """API key creation request."""
+
     role: Optional[str] = "user"
 
 
 class APIKeyResponse(BaseModel):
-    """Schema for API key response (includes the key)."""
+    """API key response."""
+
     id: int
-    key: str  # Only returned once
+    key: str
     tenant_id: str
     role: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True
 
 
 class APIKeyList(BaseModel):
-    """Schema for listing API keys (without the key)."""
+    """API key list item."""
+
     id: int
     tenant_id: str
     role: str
     created_at: datetime
-
-    class Config:
-        from_attributes = True
-
-
-class UserInfo(BaseModel):
-    """Schema for user information."""
-    id: str
-    email: str
-    tenant_id: str
-    role: str
-
-    class Config:
-        from_attributes = True

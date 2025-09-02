@@ -4,19 +4,22 @@ from pathlib import Path
 from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from api.middleware.rate_limit import rate_limit_middleware
-from api.middleware.auth import auth_middleware
 
+from api.metrics import metrics_endpoint
+from api.middleware.auth import auth_middleware
+from api.routers.answer import router as answer_router
+from api.routers.auth import router as auth_router
+from api.routers.feedback import router as feedback_router
 from api.routers.health import router as health_router
 from api.routers.ingest import router as ingest_router
 from api.routers.query import router as query_router
-from api.routers.answer import router as answer_router
 from api.websocket import router as websocket_router
-from api.routers.auth import router as auth_router
-from api.routers.feedback import router as feedback_router
-from api.metrics import metrics_endpoint
+
 # OpenTelemetry temporarily disabled for stability
-# from api.tracing import setup_tracing, instrument_fastapi, instrument_redis, instrument_sqlalchemy, instrument_logging, metrics_middleware
+# from api.tracing import (
+#     setup_tracing, instrument_fastapi, instrument_redis,
+#     instrument_sqlalchemy, instrument_logging, metrics_middleware
+# )
 
 # Load environment variables from .env file
 env_path = Path(__file__).parent.parent / ".env"
@@ -32,10 +35,12 @@ app = FastAPI(title="PromoAI RAG API")
 # instrument_logging()
 
 # Configure CORS
-frontend_origins = os.getenv("FRONTEND_ORIGINS", "http://localhost:3000").split(",")
+cors_origins = os.getenv(
+    "CORS_ORIGINS", "http://localhost:3000,http://localhost:5173"
+).split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=frontend_origins,
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -44,8 +49,8 @@ app.add_middleware(
 # Add auth middleware to store user in request.state
 app.middleware("http")(auth_middleware)
 
-# Add rate limiting middleware
-app.middleware("http")(rate_limit_middleware)
+# Add rate limiting middleware (temporarily disabled for testing)
+# app.middleware("http")(rate_limit_middleware)
 
 # Add metrics middleware
 # app.middleware("http")(metrics_middleware)  # OpenTelemetry temporarily disabled

@@ -16,7 +16,11 @@ repos:
     rev: v1.7.1
     hooks:
       - id: mypy
-        additional_dependencies: [types-all]
+        additional_dependencies: [
+          "types-PyJWT",
+          "types-passlib",
+          "types-requests"
+        ]
 
   - repo: https://github.com/commitizen-tools/commitizen
     rev: v3.13.0

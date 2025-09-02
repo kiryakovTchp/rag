@@ -11,15 +11,18 @@
 git clone https://github.com/kiryakovTchp/rag.git
 cd rag
 
-# Настройте Google OAuth (см. docs/GOOGLE_OAUTH_SETUP.md)
+# Настройте переменные окружения
 cp env.example .env
-# Отредактируйте .env файл
+# Отредактируйте .env файл, особенно JWT_SECRET_KEY
 
-# Запустите весь проект
-./start.sh
+# Запустите базу данных и Redis
+docker compose up -d db redis
 
-# Или используйте Makefile
-make start
+# Запустите API и worker
+docker compose up -d api worker
+
+# Запустите фронтенд
+cd web && npm ci && npm run build && npm run dev
 ```
 
 ### Вариант 2: Ручной запуск

@@ -22,5 +22,9 @@ COPY storage/ /app/storage/
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
+# Создаем непривилегированного пользователя
+RUN adduser --disabled-password --gecos "" app && chown -R app:app /app
+USER app
+
 # Запускаем worker
 CMD ["celery", "-A", "workers.app", "worker", "--loglevel=info"]

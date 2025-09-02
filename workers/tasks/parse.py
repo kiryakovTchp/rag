@@ -1,7 +1,7 @@
-import asyncio
 import logging
 import os
 import tempfile
+from typing import Optional
 
 # Lazy imports to prevent startup failures
 # from db.models import Document, Element, Job
@@ -17,7 +17,7 @@ logger = logging.getLogger(__name__)
 
 
 @celery_app.task(bind=True, queue="parse")
-def parse_document(self, document_id: int, tenant_id: str = None) -> dict:
+def parse_document(self, document_id: int, tenant_id: Optional[str] = None) -> dict:
     """Parse document into elements."""
     # Lazy import database dependencies
     try:
@@ -26,7 +26,7 @@ def parse_document(self, document_id: int, tenant_id: str = None) -> dict:
     except ImportError as e:
         logger.error(f"Database import failed: {e}")
         raise ImportError("Database service temporarily unavailable") from e
-    
+
     logger.info(f"Starting parse task for document {document_id}")
     db = SessionLocal()
     storage = ObjectStore()
@@ -40,7 +40,11 @@ def parse_document(self, document_id: int, tenant_id: str = None) -> dict:
         logger.info(f"Processing document: {document.name} ({document.mime})")
 
         # Update job status
-        job = db.query(Job).filter(Job.document_id == document_id, Job.type == "parse").first()
+        job = (
+            db.query(Job)
+            .filter(Job.document_id == document_id, Job.type == "parse")
+            .first()
+        )
         if job:
             job.status = "running"
             job.progress = 10
@@ -146,7 +150,9 @@ def parse_document(self, document_id: int, tenant_id: str = None) -> dict:
                     )
 
             # Create chunk job
-            chunk_job = Job(type="chunk", status="queued", progress=0, document_id=document_id)
+            chunk_job = Job(
+                type="chunk", status="queued", progress=0, document_id=document_id
+            )
             db.add(chunk_job)
             db.commit()
             logger.info(f"Created chunk job {chunk_job.id}")

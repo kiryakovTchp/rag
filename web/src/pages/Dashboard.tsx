@@ -20,7 +20,7 @@ import {
   Badge
 } from '@/components/ui'
 import { AppShell } from '@/components/AppShell'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/hooks/useAuth.tsx'
 import { apiService } from '@/services/api'
 import { Document, Job, Usage } from '@/types'
 

@@ -1,12 +1,11 @@
 """Embedding tasks for Celery."""
 
-import asyncio
 import logging
+from typing import Optional
 
 import numpy as np
-from celery import current_task
 
-from db.models import Document, Chunk, Job
+from db.models import Chunk, Document, Job
 from db.session import SessionLocal
 from services.embed.provider import EmbeddingProvider
 from services.events.bus import publish_event_sync
@@ -17,7 +16,7 @@ logger = logging.getLogger(__name__)
 
 
 @celery_app.task(bind=True, queue="embed")
-def embed_document(self, document_id: int, tenant_id: str = None) -> dict:
+def embed_document(self, document_id: int, tenant_id: Optional[str] = None) -> dict:
     """Embed document chunks.
 
     Args:
@@ -37,10 +36,16 @@ def embed_document(self, document_id: int, tenant_id: str = None) -> dict:
         if not document:
             raise ValueError(f"Document {document_id} not found")
 
-        job = session.query(Job).filter(Job.document_id == document_id, Job.type == "embed").first()
+        job = (
+            session.query(Job)
+            .filter(Job.document_id == document_id, Job.type == "embed")
+            .first()
+        )
 
         if not job:
-            job = Job(type="embed", status="running", progress=0, document_id=document_id)
+            job = Job(
+                type="embed", status="running", progress=0, document_id=document_id
+            )
             session.add(job)
             session.commit()
             session.refresh(job)
@@ -72,7 +77,11 @@ def embed_document(self, document_id: int, tenant_id: str = None) -> dict:
             job.status = "done"
             job.progress = 100
             session.commit()
-            return {"document_id": document_id, "status": "done", "message": "No chunks to embed"}
+            return {
+                "document_id": document_id,
+                "status": "done",
+                "message": "No chunks to embed",
+            }
 
         # 3) батчами по 64 получить вектора (float32, shape=(N,1024))
         embedder = EmbeddingProvider()
@@ -124,7 +133,9 @@ def embed_document(self, document_id: int, tenant_id: str = None) -> dict:
                     },
                 )
 
-            logger.info(f"Processed {processed}/{total_chunks} chunks (progress: {progress}%)")
+            logger.info(
+                f"Processed {processed}/{total_chunks} chunks (progress: {progress}%)"
+            )
 
         # 6) status='done'
         job.status = "done"

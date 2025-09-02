@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Eye, EyeOff, ArrowLeft } from 'lucide-react'
 import { Button, Input, Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/hooks/useAuth.tsx'
 
 export function Register() {
   const [formData, setFormData] = useState({
@@ -44,18 +44,8 @@ export function Register() {
     setLoading(true)
 
     try {
-      const success = await register({
-        name: formData.name,
-        email: formData.email,
-        password: formData.password,
-        confirmPassword: formData.confirmPassword
-      })
-      
-      if (success) {
-        navigate('/dashboard')
-      } else {
-        setError('Пользователь с таким email уже существует')
-      }
+      await register(formData.email, formData.password)
+      navigate('/dashboard')
     } catch (err) {
       setError('Произошла ошибка при регистрации')
     } finally {

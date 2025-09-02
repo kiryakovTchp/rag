@@ -9,6 +9,9 @@ import {
  
 } from '@/types'
 
+// Export apiClient for use in other services
+export { apiClient } from './apiClient'
+
 class ApiService {
   private baseUrl: string
   private token: string | null

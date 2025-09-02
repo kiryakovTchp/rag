@@ -1,11 +1,12 @@
 // User types
 export interface User {
-  id: string
+  id: number
   email: string
   name?: string
   plan?: 'free' | 'team' | 'pro'
   tenant_id?: string
-  created_at?: string
+  role: string
+  created_at: string
   updated_at?: string
 }
 

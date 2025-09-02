@@ -11,7 +11,7 @@ import {
   X
 } from 'lucide-react'
 import { Button } from '@/components/ui'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/hooks/useAuth.tsx'
 
 interface AppShellProps {
   children: React.ReactNode

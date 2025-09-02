@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Eye, EyeOff, ArrowLeft } from 'lucide-react'
 import { Button, Input, Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui'
-import { useAuth } from '@/contexts/AuthContext'
+import { useAuth } from '@/hooks/useAuth.tsx'
 
 export function Login() {
   const [email, setEmail] = useState('')
@@ -24,14 +24,10 @@ export function Login() {
     setLoading(true)
 
     try {
-      const success = await login({ email, password })
-      if (success) {
-        navigate(from, { replace: true })
-      } else {
-        setError('Неверный email или пароль')
-      }
+      await login(email, password)
+      navigate(from, { replace: true })
     } catch (err) {
-      setError('Произошла ошибка при входе')
+      setError('Неверный email или пароль')
     } finally {
       setLoading(false)
     }

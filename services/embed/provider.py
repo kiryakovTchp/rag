@@ -1,7 +1,7 @@
 """Embedding provider wrapper."""
 
 import os
-from typing import List
+from typing import List, Optional
 
 import numpy as np
 
@@ -12,9 +12,11 @@ from services.embed.workers_ai import WorkersAIEmbedder
 class EmbeddingProvider:
     """Embedding provider wrapper that switches between local and Workers AI."""
 
-    def __init__(self, provider: str = None):
+    def __init__(self, provider: Optional[str] = None):
         """Initialize embedding provider based on environment."""
-        self.provider = provider or os.getenv("EMBED_PROVIDER", "workers_ai")  # Default to workers_ai for API
+        self.provider = provider or os.getenv(
+            "EMBED_PROVIDER", "workers_ai"
+        )  # Default to workers_ai for API
         self.batch_size = int(os.getenv("EMBED_BATCH_SIZE", "64"))
         self._local_embedder = None
         self._workers_ai_embedder = None
@@ -24,6 +26,7 @@ class EmbeddingProvider:
         if self._local_embedder is None:
             try:
                 from services.embed.bge_m3 import BGEM3Embedder
+
                 self._local_embedder = BGEM3Embedder(batch_size=self.batch_size)
             except ImportError as e:
                 raise ImportError(
@@ -53,7 +56,7 @@ class EmbeddingProvider:
             embedder = self._get_workers_ai_embedder()
         else:
             raise ValueError(f"Unknown embedding provider: {self.provider}")
-        
+
         return embedder.embed_texts(texts)
 
     def embed_single(self, text: str) -> np.ndarray:
