@@ -5,7 +5,7 @@ import time
 from typing import Optional
 from fastapi import Request, HTTPException, status
 from fastapi.responses import JSONResponse
-import redis
+import redis.asyncio as redis
 
 # Redis connection
 redis_client = redis.Redis.from_url(
@@ -26,13 +26,13 @@ class RateLimiter:
         current_window = int(time.time() // self.window_size)
         return f"rate_limit:{identifier}:{current_window}"
     
-    def is_allowed(self, identifier: str) -> bool:
+    async def is_allowed(self, identifier: str) -> bool:
         """Check if request is allowed."""
         key = self._get_key(identifier)
         
         try:
             # Get current count
-            current_count = redis_client.get(key)
+            current_count = await redis_client.get(key)
             count = int(current_count) if current_count else 0
             
             if count >= self.requests_per_minute:
@@ -42,7 +42,7 @@ class RateLimiter:
             pipe = redis_client.pipeline()
             pipe.incr(key)
             pipe.expire(key, self.window_size)
-            pipe.execute()
+            await pipe.execute()
             
             return True
             
@@ -51,12 +51,12 @@ class RateLimiter:
             print(f"Rate limiting error: {e}")
             return True
     
-    def get_remaining(self, identifier: str) -> int:
+    async def get_remaining(self, identifier: str) -> int:
         """Get remaining requests for the current window."""
         key = self._get_key(identifier)
         
         try:
-            current_count = redis_client.get(key)
+            current_count = await redis_client.get(key)
             count = int(current_count) if current_count else 0
             return max(0, self.requests_per_minute - count)
         except Exception:
@@ -74,13 +74,13 @@ class QuotaLimiter:
         today = time.strftime("%Y-%m-%d")
         return f"quota:{tenant_id}:{today}"
     
-    def check_quota(self, tenant_id: str, tokens: int) -> bool:
+    async def check_quota(self, tenant_id: str, tokens: int) -> bool:
         """Check if request fits within daily quota."""
         key = self._get_key(tenant_id)
         
         try:
             # Get current usage
-            current_usage = redis_client.get(key)
+            current_usage = await redis_client.get(key)
             usage = int(current_usage) if current_usage else 0
             
             if usage + tokens > self.daily_token_quota:
@@ -90,7 +90,7 @@ class QuotaLimiter:
             pipe = redis_client.pipeline()
             pipe.incrby(key, tokens)
             pipe.expire(key, 86400)  # 24 hours
-            pipe.execute()
+            await pipe.execute()
             
             return True
             
@@ -99,12 +99,12 @@ class QuotaLimiter:
             print(f"Quota limiting error: {e}")
             return True
     
-    def get_remaining_quota(self, tenant_id: str) -> int:
+    async def get_remaining_quota(self, tenant_id: str) -> int:
         """Get remaining daily quota."""
         key = self._get_key(tenant_id)
         
         try:
-            current_usage = redis_client.get(key)
+            current_usage = await redis_client.get(key)
             usage = int(current_usage) if current_usage else 0
             return max(0, self.daily_token_quota - usage)
         except Exception:
@@ -159,8 +159,8 @@ async def rate_limit_middleware(request: Request, call_next):
         identifier = f"ip:{request.client.host}"
     
     # Check rate limit
-    if not rate_limiter.is_allowed(identifier):
-        remaining = rate_limiter.get_remaining(identifier)
+    if not await rate_limiter.is_allowed(identifier):
+        remaining = await rate_limiter.get_remaining(identifier)
         
         response = JSONResponse(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
@@ -177,18 +177,18 @@ async def rate_limit_middleware(request: Request, call_next):
     
     # Add rate limit headers
     response = await call_next(request)
-    remaining = rate_limiter.get_remaining(identifier)
+    remaining = await rate_limiter.get_remaining(identifier)
     response.headers["X-RateLimit-Limit"] = str(rate_limiter.requests_per_minute)
     response.headers["X-RateLimit-Remaining"] = str(remaining)
     
     return response
 
 
-def check_quota(tenant_id: str, tokens: int) -> bool:
+async def check_quota(tenant_id: str, tokens: int) -> bool:
     """Check daily token quota."""
-    return quota_limiter.check_quota(tenant_id, tokens)
+    return await quota_limiter.check_quota(tenant_id, tokens)
 
 
-def get_remaining_quota(tenant_id: str) -> int:
+async def get_remaining_quota(tenant_id: str) -> int:
     """Get remaining daily quota."""
-    return quota_limiter.get_remaining_quota(tenant_id)
+    return await quota_limiter.get_remaining_quota(tenant_id)

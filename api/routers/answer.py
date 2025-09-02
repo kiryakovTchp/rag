@@ -24,8 +24,8 @@ async def generate_answer(
     """Generate an answer to a query."""
     # Check daily quota (estimate tokens)
     estimated_tokens = len(request.query.split()) * 2  # Rough estimate
-    if not check_quota(user.tenant_id, estimated_tokens):
-        remaining = get_remaining_quota(user.tenant_id)
+    if not await check_quota(user.tenant_id, estimated_tokens):
+        remaining = await get_remaining_quota(user.tenant_id)
         raise HTTPException(
             status_code=402,
             detail=f"Daily token quota exceeded. Remaining: {remaining} tokens"
@@ -97,8 +97,8 @@ async def stream_answer(
     """Generate a streaming answer to a query."""
     # Check daily quota (estimate tokens)
     estimated_tokens = len(request.query.split()) * 2  # Rough estimate
-    if not check_quota(user.tenant_id, estimated_tokens):
-        remaining = get_remaining_quota(user.tenant_id)
+    if not await check_quota(user.tenant_id, estimated_tokens):
+        remaining = await get_remaining_quota(user.tenant_id)
         raise HTTPException(
             status_code=402,
             detail=f"Daily token quota exceeded. Remaining: {remaining} tokens"
