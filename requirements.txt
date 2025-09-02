@@ -1,12 +1,12 @@
 # Core FastAPI
 fastapi==0.115.0
-uvicorn[standard]==0.32.0
+uvicorn==0.32.0
 pydantic==2.8.0
 pydantic-settings==2.2.0
 
 # Database
 sqlalchemy==2.0.23
-psycopg[binary]==3.1.13
+psycopg==3.1.13
 pgvector==0.2.4
 
 # Redis & Celery
@@ -18,7 +18,8 @@ boto3==1.34.0
 
 # Auth
 PyJWT==2.8.0
-passlib[bcrypt]==1.7.4
+passlib==1.7.4
+bcrypt==4.1.2
 python-multipart==0.0.6
 
 # Utils
@@ -33,8 +34,8 @@ unstructured==0.18.3
 camelot-py==1.0.9
 pandas==2.2.2
 
-# ML/AI
-sentence-transformers==2.0.0
+# ML/AI - Updated for compatibility
+sentence-transformers==2.2.2
 transformers==4.21.3
 huggingface-hub==0.10.1
 google-genai==0.8.0

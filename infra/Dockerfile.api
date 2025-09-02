@@ -1,6 +1,5 @@
+# Используем официальный Python образ
 FROM python:3.11-slim
-
-WORKDIR /app
 
 # Устанавливаем системные зависимости
 RUN apt-get update && apt-get install -y \
@@ -15,11 +14,15 @@ RUN pip install --no-cache-dir -r requirements.txt -c constraints.txt
 
 # Копируем файлы с сохранением структуры
 COPY api/ /app/api/
+COPY services/ /app/services/
 COPY db/ /app/db/
 COPY storage/ /app/storage/
-COPY services/ /app/services/
-COPY workers/ /app/workers/
 
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Открываем порт
 EXPOSE 8000
 
+# Запускаем приложение
 CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]

@@ -1,5 +1,4 @@
 from services.chunking.headers import MarkdownHeaderSplitter
-from services.chunking.semantic import SemanticSplitter
 from services.chunking.token import TokenTextSplitter
 
 
@@ -7,7 +6,7 @@ class ChunkingPipeline:
     def __init__(self) -> None:
         self.header_splitter = MarkdownHeaderSplitter()
         self.token_splitter = TokenTextSplitter(chunk_size=500, chunk_overlap=75)
-        self.semantic_splitter = SemanticSplitter()
+        # SemanticSplitter removed - placeholder for future implementation
 
     def build_chunks(self, elements: list[dict]) -> list[dict]:
         """Build chunks from elements using the full pipeline."""

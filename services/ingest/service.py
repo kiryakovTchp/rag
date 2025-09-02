@@ -17,7 +17,7 @@ class IngestService:
         self.db = db
         self.storage = ObjectStore()
 
-    def ingest_document(
+    async def ingest_document(
         self, file: UploadFile, tenant_id: Optional[str] = None, safe_mode: bool = False
     ) -> int:
         """
@@ -34,7 +34,7 @@ class IngestService:
         
         # Save file to temporary location
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
-            content = file.file.read()
+            content = await file.read()  # UploadFile.read is async
             temp_file.write(content)
             temp_file_path = temp_file.name
 

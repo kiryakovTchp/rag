@@ -52,7 +52,7 @@ async def ingest_document(
 
     # Process document
     service = IngestService(db)
-    job_id = service.ingest_document(file, tenant_id, safe_mode)
+    job_id = await service.ingest_document(file, tenant_id, safe_mode)
 
     return IngestResponse(job_id=job_id, status="queued", message="Document uploaded successfully")
 

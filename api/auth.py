@@ -31,10 +31,22 @@ async def get_current_user_ws(websocket: WebSocket) -> Optional[Dict[str, Any]]:
         if user:
             return user
         
-        # Try API key
-        user = await validate_api_key(token)
-        if user:
-            return user
+        # Try API key with proper DB session
+        try:
+            from api.dependencies.db import get_db_lazy
+            db_gen = get_db_lazy()
+            try:
+                db = next(db_gen)
+                user = await validate_api_key(token, db)
+                if user:
+                    return user
+            finally:
+                try:
+                    next(db_gen)
+                except StopIteration:
+                    pass
+        except Exception:
+            pass
             
         return None
             

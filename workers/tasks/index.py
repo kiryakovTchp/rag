@@ -1,6 +1,7 @@
 """Index embeddings task."""
 
 import time
+import logging
 from typing import List
 
 from celery import current_task
@@ -11,6 +12,8 @@ from db.session import SessionLocal
 from services.embed.provider import EmbeddingProvider
 from services.index.pgvector import PGVectorIndex
 from workers.app import celery_app
+
+logger = logging.getLogger(__name__)
 
 
 @celery_app.task(bind=True)
@@ -39,7 +42,7 @@ def index_document_embeddings(self, document_id: int) -> dict:
         if not document:
             raise ValueError(f"Document {document_id} not found")
         
-        print(f"Starting index task for document {document_id}")
+        logger.info(f"Starting index task for document {document_id}")
         
         # Get chunks without embeddings
         chunks = db.query(Chunk).filter(
@@ -50,7 +53,7 @@ def index_document_embeddings(self, document_id: int) -> dict:
         ).all()
         
         if not chunks:
-            print(f"No chunks to index for document {document_id}")
+            logger.info(f"No chunks to index for document {document_id}")
             return {
                 "status": "success",
                 "document_id": document_id,
@@ -58,7 +61,7 @@ def index_document_embeddings(self, document_id: int) -> dict:
                 "time_taken": time.time() - start_time
             }
         
-        print(f"Found {len(chunks)} chunks to index")
+        logger.info(f"Found {len(chunks)} chunks to index")
         
         # Initialize services
         embedder = EmbeddingProvider()
@@ -91,7 +94,7 @@ def index_document_embeddings(self, document_id: int) -> dict:
                 }
             )
             
-            print(f"Processed {processed}/{total_chunks} chunks (progress: {progress}%)")
+            logger.info(f"Processed {processed}/{total_chunks} chunks (progress: {progress}%)")
         
         # Convert to numpy array
         import numpy as np
@@ -104,7 +107,7 @@ def index_document_embeddings(self, document_id: int) -> dict:
         
         time_taken = time.time() - start_time
         
-        print(f"Indexed {len(chunks)} chunks in {time_taken:.2f}s")
+        logger.info(f"Indexed {len(chunks)} chunks in {time_taken:.2f}s")
         
         return {
             "status": "success",
@@ -115,7 +118,7 @@ def index_document_embeddings(self, document_id: int) -> dict:
         }
         
     except Exception as e:
-        print(f"Index task failed for document {document_id}: {e}")
+        logger.error(f"Index task failed for document {document_id}: {e}")
         current_task.update_state(
             state="FAILURE",
             meta={

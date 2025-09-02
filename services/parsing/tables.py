@@ -1,11 +1,14 @@
 import io
 import uuid
+import logging
 
 import camelot
 import pandas as pd
 import pdfplumber
 
 from storage.r2 import ObjectStore
+
+logger = logging.getLogger(__name__)
 
 
 class TableParser:
@@ -33,7 +36,7 @@ class TableParser:
             return tables
 
         except Exception as e:
-            print(f"Warning: Failed to extract tables: {e}")
+            logger.warning(f"Warning: Failed to extract tables: {e}")
             return []
 
     def _extract_pdf_tables(self, file_path: str) -> list[dict]:
@@ -64,7 +67,7 @@ class TableParser:
                                 }
                             )
         except Exception as e:
-            print(f"pdfplumber failed: {e}")
+            logger.warning(f"pdfplumber failed: {e}")
 
         # Try camelot as backup
         try:
@@ -88,7 +91,7 @@ class TableParser:
                         }
                     )
         except Exception as e:
-            print(f"camelot failed: {e}")
+            logger.warning(f"camelot failed: {e}")
 
         return tables
 
@@ -121,7 +124,7 @@ class TableParser:
                 )
 
         except Exception as e:
-            print(f"Failed to extract office table: {e}")
+            logger.warning(f"Failed to extract office table: {e}")
 
         return tables
 
@@ -243,7 +246,7 @@ class TableParser:
                 )
 
         except Exception as e:
-            print(f"Failed to extract text tables: {e}")
+            logger.warning(f"Failed to extract text tables: {e}")
 
         return tables
 
@@ -253,4 +256,4 @@ class TableParser:
             data_stream = io.BytesIO(table_text.encode("utf-8"))
             self.storage.put_data(data_stream, artifact_key)
         except Exception as e:
-            print(f"Failed to save table artifact: {e}")
+            logger.warning(f"Failed to save table artifact: {e}")

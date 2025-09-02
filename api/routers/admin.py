@@ -1,5 +1,6 @@
 """Admin API router."""
 
+import os
 from fastapi import APIRouter, HTTPException, Header
 from typing import Optional
 
@@ -17,16 +18,17 @@ async def reindex_document(
     
     Args:
         document_id: Document ID to reindex
-        authorization: Authorization header (placeholder)
+        authorization: Authorization header with ADMIN_API_TOKEN
         
     Returns:
         Task result
     """
-    # Simple auth check (placeholder)
-    if not authorization or authorization != "Bearer admin-token":
+    # Check admin token from environment
+    expected_token = os.getenv("ADMIN_API_TOKEN")
+    if not expected_token or authorization != f"Bearer {expected_token}":
         raise HTTPException(
             status_code=401,
-            detail="Unauthorized. Use 'Bearer admin-token' header."
+            detail="Unauthorized. Provide valid ADMIN_API_TOKEN in the Authorization header."
         )
     
     # Trigger reindex task

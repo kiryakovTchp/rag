@@ -1,6 +1,5 @@
+# Используем официальный Python образ
 FROM python:3.11-slim
-
-WORKDIR /app
 
 # Устанавливаем системные зависимости
 RUN apt-get update && apt-get install -y \
@@ -15,8 +14,12 @@ RUN pip install --no-cache-dir -r requirements.txt -c constraints.txt
 
 # Копируем файлы с сохранением структуры
 COPY workers/ /app/workers/
+COPY services/ /app/services/
 COPY db/ /app/db/
 COPY storage/ /app/storage/
-COPY services/ /app/services/
 
+# Устанавливаем рабочую директорию
+WORKDIR /app
+
+# Запускаем worker
 CMD ["celery", "-A", "workers.app", "worker", "--loglevel=info"]

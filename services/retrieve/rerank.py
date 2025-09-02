@@ -2,9 +2,12 @@
 
 import os
 import time
+import logging
 from typing import List, Tuple
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 
 class WorkersAIReranker:
@@ -29,8 +32,8 @@ class WorkersAIReranker:
             List of indices in order of relevance
         """
         if not self.api_token:
-            print("⚠️ Workers AI reranker not available: no API token")
-            print("⚠️ WARNING: Falling back to original order - no reranking applied")
+            logger.warning("Workers AI reranker not available: no API token")
+            logger.warning("WARNING: Falling back to original order - no reranking applied")
             return list(range(min(top_k, len(pairs))))
         
         if not pairs:
@@ -67,7 +70,7 @@ class WorkersAIReranker:
                         indices = result.get("result", {}).get("indices", [])
                         return indices[:top_k]
                     else:
-                        print(f"⚠️ Workers AI reranker failed: {result.get('errors', [])}")
+                        logger.warning(f"Workers AI reranker failed: {result.get('errors', [])}")
                         break
                 elif response.status_code == 429:
                     # Rate limit, wait and retry
@@ -75,16 +78,16 @@ class WorkersAIReranker:
                         time.sleep(self.retry_delay * (2 ** attempt))
                         continue
                 else:
-                    print(f"⚠️ Workers AI reranker error: {response.status_code}")
+                    logger.warning(f"Workers AI reranker error: {response.status_code}")
                     break
                     
             except requests.RequestException as e:
-                print(f"⚠️ Workers AI reranker request failed: {e}")
+                logger.warning(f"Workers AI reranker request failed: {e}")
                 if attempt < self.max_retries - 1:
                     time.sleep(self.retry_delay * (2 ** attempt))
                     continue
                 break
         
         # Fallback to original order
-        print("⚠️ WARNING: Reranking failed, falling back to original order - no reranking applied")
+        logger.warning("WARNING: Reranking failed, falling back to original order - no reranking applied")
         return list(range(min(top_k, len(pairs))))
