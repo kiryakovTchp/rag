@@ -5,14 +5,15 @@ import logging
 import time
 from typing import Optional, Dict, Any
 
-from opentelemetry import trace
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import BatchSpanProcessor
-from opentelemetry.sdk.resources import Resource
-from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
-from opentelemetry.instrumentation.celery import CeleryInstrumentor
-from opentelemetry.instrumentation.redis import RedisInstrumentor
-from opentelemetry.instrumentation.logging import LoggingInstrumentor
+# OpenTelemetry temporarily disabled for stability
+# from opentelemetry import trace
+# from opentelemetry.sdk.trace import TracerProvider
+# from opentelemetry.sdk.trace.export import BatchSpanProcessor
+# from opentelemetry.sdk.resources import Resource
+# from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter
+# from opentelemetry.instrumentation.celery import CeleryInstrumentor
+# from opentelemetry.instrumentation.redis import RedisInstrumentor
+# from opentelemetry.instrumentation.logging import LoggingInstrumentor
 
 from prometheus_client import Counter, Histogram, Gauge, generate_latest, CONTENT_TYPE_LATEST
 from celery import Task
@@ -56,68 +57,32 @@ WORKER_TASKS_PROCESSED = Counter(
 
 def setup_tracing():
     """Setup OpenTelemetry tracing for workers."""
-    # Get configuration from environment
-    otel_endpoint = os.getenv("OTEL_EXPORTER_OTLP_ENDPOINT", "http://localhost:4317")
-    service_name = os.getenv("OTEL_SERVICE_NAME", "worker")
-    
-    # Create resource with service information
-    resource = Resource.create({
-        "service.name": service_name,
-        "service.version": "1.0.0",
-        "deployment.environment": os.getenv("ENVIRONMENT", "development"),
-        "worker.id": os.getenv("CELERY_WORKER_ID", "unknown")
-    })
-    
-    # Create tracer provider
-    provider = TracerProvider(resource=resource)
-    
-    # Add OTLP exporter
-    if otel_endpoint != "none":
-        otlp_exporter = OTLPSpanExporter(endpoint=otel_endpoint)
-        provider.add_span_processor(BatchSpanProcessor(otlp_exporter))
-    
-    # Set global tracer provider
-    trace.set_tracer_provider(provider)
-    
-    # Get tracer
-    tracer = trace.get_tracer(__name__)
-    
-    logger.info(f"OpenTelemetry tracing initialized for {service_name}")
-    return tracer
+    # OpenTelemetry temporarily disabled for stability
+    logger.info("OpenTelemetry tracing disabled for stability")
+    return None
 
 def instrument_celery():
     """Instrument Celery with OpenTelemetry."""
-    try:
-        CeleryInstrumentor().instrument()
-        logger.info("Celery instrumented with OpenTelemetry")
-    except Exception as e:
-        logger.warning(f"Failed to instrument Celery: {e}")
+    # OpenTelemetry temporarily disabled for stability
+    logger.info("Celery instrumentation disabled for stability")
 
 def instrument_redis():
     """Instrument Redis with OpenTelemetry."""
-    try:
-        RedisInstrumentor().instrument()
-        logger.info("Redis instrumented with OpenTelemetry")
-    except Exception as e:
-        logger.warning(f"Failed to instrument Redis: {e}")
+    # OpenTelemetry temporarily disabled for stability
+    logger.info("Redis instrumentation disabled for stability")
 
 def instrument_logging():
     """Instrument logging with OpenTelemetry."""
-    try:
-        LoggingInstrumentor().instrument()
-        logger.info("Logging instrumented with OpenTelemetry")
-    except Exception as e:
-        logger.warning(f"Failed to instrument logging: {e}")
+    # OpenTelemetry temporarily disabled for stability
+    logger.info("Logging instrumentation disabled for stability")
 
 def get_tracer():
     """Get the global tracer."""
-    return trace.get_tracer(__name__)
+    return None
 
 def create_span(name: str, attributes: Optional[Dict[str, Any]] = None):
     """Create a span with given name and attributes."""
-    tracer = get_tracer()
-    with tracer.start_as_current_span(name, attributes=attributes or {}) as span:
-        return span
+    return None
 
 # Celery task wrapper for tracing and metrics
 class TracedTask(Task):

@@ -1,7 +1,12 @@
 import os
+import sys
 from collections.abc import Generator
+from pathlib import Path
 
 import redis
+
+# Добавляем корневую папку в путь
+sys.path.append(str(Path(__file__).parent.parent))
 
 from db.session import SessionLocal
 from storage.r2 import ObjectStore

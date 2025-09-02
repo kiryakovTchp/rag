@@ -40,12 +40,12 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - DATABASE_URL=postgresql://rag_user:rag_password@postgres:5432/rag_db
-      - REDIS_URL=redis://redis:6379
-      - JWT_SECRET_KEY=your-super-secret-jwt-key-change-in-production
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
-      - CORS_ORIGINS=http://localhost:3000,http://frontend:3000
+      - CORS_ORIGINS=${CORS_ORIGINS}
     volumes:
       - ./api:/app/api
       - ./services:/app/services
@@ -67,10 +67,10 @@ services:
       context: .
       dockerfile: infra/Dockerfile.worker
     environment:
-      - DATABASE_URL=postgresql://rag_user:rag_password@postgres:5432/rag_db
-      - REDIS_URL=redis://redis:6379
-      - CELERY_BROKER_URL=redis://redis:6379/0
-      - CELERY_RESULT_BACKEND=redis://redis:6379/0
+      - DATABASE_URL=${DATABASE_URL}
+      - REDIS_URL=${REDIS_URL}
+      - CELERY_BROKER_URL=${REDIS_URL}/0
+      - CELERY_RESULT_BACKEND=${REDIS_URL}/0
     volumes:
       - ./services:/app/services
       - ./workers:/app/workers
@@ -89,10 +89,10 @@ services:
     ports:
       - "3000:3000"
     environment:
-      - VITE_API_BASE_URL=http://localhost:8000
-      - VITE_WS_URL=ws://localhost:8000
-      - VITE_AUTH_ENABLED=true
-      - VITE_GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
+      - VITE_API_BASE_URL=${VITE_API_BASE_URL}
+      - VITE_WS_URL=${VITE_WS_URL}
+      - VITE_AUTH_ENABLED=${VITE_AUTH_ENABLED}
+      - VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}
     volumes:
       - ./web:/app
       - /app/node_modules

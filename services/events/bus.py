@@ -4,8 +4,8 @@ import json
 import asyncio
 import logging
 from typing import Callable, Dict, Any, Optional, Union
-from datetime import datetime
-import aioredis
+from datetime import datetime, timezone
+import redis.asyncio as redis
 from contextlib import asynccontextmanager
 
 # Import metrics if available (API context)
@@ -29,13 +29,13 @@ class EventBus:
             redis_url: Redis connection URL. Defaults to REDIS_URL env var.
         """
         self.redis_url = redis_url or "redis://localhost:6379"
-        self._redis: Optional[aioredis.Redis] = None
+        self._redis: Optional[redis.Redis] = None
         self._subscribers: Dict[str, asyncio.Task] = {}
 
-    async def _get_redis(self) -> aioredis.Redis:
+    async def _get_redis(self) -> redis.Redis:
         """Get Redis connection, creating if needed."""
-        if self._redis is None or self._redis.closed:
-            self._redis = await aioredis.from_url(self.redis_url)
+        if self._redis is None:
+            self._redis = redis.from_url(self.redis_url)
         return self._redis
 
     async def publish_event(self, topic: str, payload: Dict[str, Any]) -> bool:
@@ -56,7 +56,7 @@ class EventBus:
 
             # Add timestamp and tenant_id if not present
             if "ts" not in payload:
-                payload["ts"] = datetime.utcnow().isoformat() + "Z"
+                payload["ts"] = datetime.now(timezone.utc).isoformat()
             if "tenant_id" not in payload and tenant_id:
                 payload["tenant_id"] = tenant_id
 
@@ -109,7 +109,7 @@ class EventBus:
 
     async def close(self):
         """Close Redis connection."""
-        if self._redis and not self._redis.closed:
+        if self._redis:
             await self._redis.close()
             self._redis = None
 

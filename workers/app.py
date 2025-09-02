@@ -1,7 +1,8 @@
 import os
 
 from celery import Celery
-from workers.tracing import setup_tracing, instrument_celery, instrument_redis, instrument_logging, TracedTask
+# OpenTelemetry temporarily disabled for stability
+# from workers.tracing import setup_tracing, instrument_celery, instrument_redis, instrument_logging, TracedTask
 
 # Configure Celery
 REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379")
@@ -13,11 +14,11 @@ celery_app = Celery(
     include=["workers.tasks.parse", "workers.tasks.chunk", "workers.tasks.embed"],
 )
 
-# Setup OpenTelemetry tracing
-setup_tracing()
-instrument_celery()
-instrument_redis()
-instrument_logging()
+# OpenTelemetry temporarily disabled for stability
+# setup_tracing()
+# instrument_celery()
+# instrument_redis()
+# instrument_logging()
 
 # Celery configuration
 celery_app.conf.update(
@@ -31,7 +32,7 @@ celery_app.conf.update(
     task_soft_time_limit=25 * 60,  # 25 minutes
     worker_prefetch_multiplier=1,
     worker_max_tasks_per_child=1000,
-    task_cls=TracedTask,  # Use traced task class
+    # task_cls=TracedTask,  # OpenTelemetry temporarily disabled
 )
 
 
