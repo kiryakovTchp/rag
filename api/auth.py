@@ -8,9 +8,7 @@ from fastapi import HTTPException, Depends, Request, WebSocket, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
-# Lazy imports to prevent startup failures
-# from db.session import get_db
-# from db.models import APIKey
+from api.dependencies.db import get_db_lazy
 
 security = HTTPBearer(auto_error=False)
 
@@ -44,7 +42,14 @@ async def get_current_user_ws(websocket: WebSocket) -> Optional[Dict[str, Any]]:
         return None
 
 async def get_current_user_dict(request: Request, db: Session = Depends(lambda: get_db_lazy())) -> Dict[str, Any]:
-    """Get current user from request as dictionary."""
+    """Get current user from request as dictionary.
+    
+    Returns:
+        Dict with keys: tenant_id, user_id, role, email
+        
+    Note: This function returns a dictionary and is used by ingest routes and websockets.
+    For SQLAlchemy User objects, use get_current_user from api.dependencies.auth.
+    """
     if not require_auth():
         return {
             "tenant_id": "anonymous",
@@ -97,17 +102,6 @@ async def get_current_user_optional(request: Request, db: Session = Depends(lamb
     except HTTPException:
         return None
 
-def get_db_lazy():
-    """Lazy database dependency."""
-    try:
-        from db.session import get_db
-        return next(get_db())
-    except ImportError as e:
-        raise HTTPException(
-            status_code=503,
-            detail="Database service temporarily unavailable"
-        )
-
 async def validate_jwt_token(token: str) -> Optional[Dict[str, Any]]:
     """Validate JWT token."""
     secret = os.getenv("NEXTAUTH_SECRET")
@@ -130,20 +124,28 @@ async def validate_api_key(api_key: str, db: Session) -> Optional[Dict[str, Any]
     key_hash = hashlib.sha256(api_key.encode()).hexdigest()
     
     # Check if key exists and is not revoked
-    db_key = db.query(APIKey).filter(
-        APIKey.key_hash == key_hash,
-        APIKey.revoked_at.is_(None)
-    ).first()
-    
-    if not db_key:
+    try:
+        from db.models import APIKey
+        db_key = db.query(APIKey).filter(
+            APIKey.key_hash == key_hash,
+            APIKey.revoked_at.is_(None)
+        ).first()
+        
+        if not db_key:
+            return None
+        
+        return {
+            "tenant_id": db_key.tenant_id,
+            "user_id": f"api_key_{db_key.id}",
+            "role": db_key.role
+        }
+    except Exception:
         return None
-    
-    return {
-        "tenant_id": db_key.tenant_id,
-        "user_id": f"api_key_{db_key.id}",
-        "role": db_key.role
-    }
 
 def require_auth() -> bool:
-    """Check if authentication is required."""
-    return os.getenv("REQUIRE_AUTH", "false").lower() == "true"
+    """Check if authentication is required.
+    
+    Defaults to true to ensure secure API access.
+    Set REQUIRE_AUTH=false to disable authentication for development/testing.
+    """
+    return os.getenv("REQUIRE_AUTH", "true").lower() == "true"
