@@ -13,15 +13,38 @@ echo "✅ No SQLite traces found"
 
 # 2) Check pgvector extension
 echo "2. Checking pgvector extension..."
-if ! psql -U postgres -d postgres -tAc "\dx" | grep -qE '^\s*vector\s'; then
-    echo "❌ pgvector extension missing"
+# Ensure db service is running
+docker compose up -d db
+
+# Wait for db to be healthy
+echo "Waiting for database to be ready..."
+timeout=60
+while [ $timeout -gt 0 ]; do
+    if docker compose exec -T db pg_isready -U rag_user -d rag_db >/dev/null 2>&1; then
+        break
+    fi
+    sleep 1
+    timeout=$((timeout - 1))
+done
+
+if [ $timeout -eq 0 ]; then
+    echo "❌ Database failed to become ready within 60 seconds"
     exit 1
 fi
-echo "✅ pgvector extension found"
+
+# Create extension if it doesn't exist
+if ! docker compose exec -T db psql -U rag_user -d rag_db -tAc "\dx" | grep -qE '^\s*vector\s'; then
+    echo "Creating pgvector extension..."
+    if ! docker compose exec -T db psql -U rag_user -d rag_db -c "CREATE EXTENSION IF NOT EXISTS vector;"; then
+        echo "❌ Failed to create pgvector extension"
+        exit 1
+    fi
+fi
+echo "✅ pgvector extension present"
 
 # 3) Check vector(1024) column type
 echo "3. Checking embeddings.vector column type..."
-if ! psql -U postgres -d postgres -tAc "\d+ embeddings" | grep -q "vector(1024)"; then
+if ! docker compose exec -T db psql -U rag_user -d rag_db -tAc "\d+ embeddings" | grep -q "vector(1024)"; then
     echo "❌ embeddings.vector is not vector(1024)"
     exit 1
 fi
@@ -29,12 +52,12 @@ echo "✅ embeddings.vector is vector(1024)"
 
 # 4) Check ivfflat index with vector_cosine_ops
 echo "4. Checking ivfflat index..."
-if ! psql -U postgres -d postgres -tAc "\d+ embeddings" | grep -q "USING ivfflat"; then
+if ! docker compose exec -T db psql -U rag_user -d rag_db -tAc "\d+ embeddings" | grep -q "USING ivfflat"; then
     echo "❌ ivfflat index missing"
     exit 1
 fi
 
-if ! psql -U postgres -d postgres -tAc "\d+ embeddings" | grep -q "vector_cosine_ops"; then
+if ! docker compose exec -T db psql -U rag_user -d rag_db -tAc "\d+ embeddings" | grep -q "vector_cosine_ops"; then
     echo "❌ ivfflat without vector_cosine_ops"
     exit 1
 fi

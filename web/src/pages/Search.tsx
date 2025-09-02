@@ -5,9 +5,8 @@ import {
   FileText, 
   BookOpen,
   Filter,
-  Settings,
   TrendingUp,
-  Clock,
+
   Star
 } from 'lucide-react'
 import { 
@@ -19,7 +18,7 @@ import {
   Button,
   Badge,
   Input,
-  Separator
+
 } from '@/components/ui'
 import { AppShell } from '@/components/AppShell'
 import { useAuth } from '@/contexts/AuthContext'

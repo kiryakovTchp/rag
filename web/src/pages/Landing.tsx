@@ -8,10 +8,7 @@ import {
   Sparkles, 
   Users, 
   Shield, 
-  FileText,
-  Search,
-  Zap,
-  BarChart3
+  Search
 } from 'lucide-react'
 import { 
   Button, 

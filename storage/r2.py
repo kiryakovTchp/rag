@@ -95,7 +95,7 @@ class ObjectStore:
             self.s3_client.delete_object(Bucket=self.bucket, Key=key)
             return True
         except ClientError as e:
-            print(f"Failed to delete {key}: {e}")
+            logger.warning(f"Failed to delete {key}: {e}")
             return False
 
     def exists(self, key: str) -> bool:

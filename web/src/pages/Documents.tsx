@@ -4,10 +4,7 @@ import {
   FileText, 
   Upload, 
   Search, 
-  Filter,
-  MoreVertical,
   Download,
-  Trash2,
   Eye,
   Clock,
   CheckCircle,
@@ -22,15 +19,15 @@ import {
   Button,
   Badge,
   Input,
-  Progress
+
 } from '@/components/ui'
 import { AppShell } from '@/components/AppShell'
-import { useAuth } from '@/contexts/AuthContext'
+
 import { apiService } from '@/services/api'
 import { Document } from '@/types'
 
 export function Documents() {
-  const { user } = useAuth()
+
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
   const [uploading, setUploading] = useState(false)

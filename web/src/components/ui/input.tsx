@@ -1,15 +1,16 @@
 import React from 'react'
 import { clsx } from 'clsx'
 
-interface InputProps extends React.InputHTMLAttributes<HTMLInputElement> {
+type NativeInputProps = Omit<React.InputHTMLAttributes<HTMLInputElement>, "size">;
+interface InputProps extends NativeInputProps {
   error?: boolean
-  size?: 'sm' | 'base' | 'lg'
+  uiSize?: 'sm' | 'base' | 'lg'
 }
 
 export function Input({ 
   className, 
   error = false, 
-  size = 'base',
+  uiSize = 'base',
   ...props 
 }: InputProps) {
   const base = 'w-full rounded-xl border bg-background px-3 text-sm outline-none transition-colors focus:ring-2 focus:ring-primary-500/20 disabled:cursor-not-allowed disabled:opacity-50'
@@ -27,7 +28,7 @@ export function Input({
   
   return (
     <input 
-      className={clsx(base, sizes[size], states[error ? 'error' : 'default'], className)} 
+      className={clsx(base, sizes[uiSize], states[error ? 'error' : 'default'], className)} 
       {...props} 
     />
   )

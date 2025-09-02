@@ -6,7 +6,7 @@ import {
   SearchResponse, 
   ApiKey, 
   Usage,
-  UploadForm 
+ 
 } from '@/types'
 
 class ApiService {

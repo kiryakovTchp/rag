@@ -1,9 +1,7 @@
-'use client'
-
-import { useState, useEffect, useRef } from 'react'
-import { useSession } from 'next-auth/react'
-import { redirect } from 'next/navigation'
-import { Send, ThumbsUp, ThumbsDown, FileText, X } from 'lucide-react'
+import React, { useState, useEffect, useRef } from 'react'
+import { useNavigate } from 'react-router-dom'
+import { Send, ThumbsUp, ThumbsDown, X } from 'lucide-react'
+import { useAuth } from '@/contexts/AuthContext'
 
 interface Message {
   id: string
@@ -21,8 +19,9 @@ interface Citation {
   text?: string
 }
 
-export default function ChatPage() {
-  const { data: session, status } = useSession()
+export function Chat() {
+  const { user, loading } = useAuth()
+  const navigate = useNavigate()
   const [messages, setMessages] = useState<Message[]>([])
   const [input, setInput] = useState('')
   const [isLoading, setIsLoading] = useState(false)
@@ -36,11 +35,11 @@ export default function ChatPage() {
   const lastMessageRef = useRef<Message | null>(null)
 
   useEffect(() => {
-    if (status === 'loading') return
-    if (!session) {
-      redirect('/auth/signin')
+    if (loading) return
+    if (!user) {
+      navigate('/login')
     }
-  }, [session, status])
+  }, [user, loading, navigate])
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -62,11 +61,12 @@ export default function ChatPage() {
     setIsLoading(true)
 
     try {
-      const response = await fetch('/api/proxy/answer/stream', {
+      const token = localStorage.getItem('auth_token')
+      const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/answer/stream`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.accessToken}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           query: input,
@@ -143,9 +143,10 @@ export default function ChatPage() {
     } else {
       // Fetch citation text if not available
       try {
-        const response = await fetch(`/api/proxy/chunks/${citation.chunk_id}`, {
+        const token = localStorage.getItem('auth_token')
+        const response = await fetch(`${import.meta.env.VITE_API_BASE_URL}/chunks/${citation.chunk_id}`, {
           headers: {
-            'Authorization': `Bearer ${session?.accessToken}`
+            'Authorization': `Bearer ${token}`
           }
         })
         if (response.ok) {
@@ -173,11 +174,12 @@ export default function ChatPage() {
     if (!lastMessageRef.current) return
 
     try {
-      await fetch('/api/proxy/feedback', {
+      const token = localStorage.getItem('auth_token')
+      await fetch(`${import.meta.env.VITE_API_BASE_URL}/feedback`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${session?.accessToken}`
+          'Authorization': `Bearer ${token}`
         },
         body: JSON.stringify({
           answer_id: lastMessageRef.current.id,
@@ -196,15 +198,9 @@ export default function ChatPage() {
     }
   }
 
-  const handleCitationSelect = (citationId: number) => {
-    setSelectedCitations(prev => 
-      prev.includes(citationId) 
-        ? prev.filter(id => id !== citationId)
-        : [...prev, citationId]
-    )
-  }
 
-  if (status === 'loading') {
+
+  if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-gray-900"></div>

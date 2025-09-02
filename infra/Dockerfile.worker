@@ -10,6 +10,7 @@ RUN apt-get update && apt-get install -y \
 
 # Копируем requirements.txt и constraints.txt, устанавливаем зависимости
 COPY requirements.txt constraints.txt ./
+ENV PIP_ONLY_BINARY=tokenizers,numpy,sentencepiece
 RUN pip install --no-cache-dir -r requirements.txt -c constraints.txt
 
 # Копируем файлы с сохранением структуры
