@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
 from api.dependencies.db import get_db_lazy
-from api.auth import get_current_user
+from api.auth import get_current_user_dict
 from api.middleware.rate_limit import check_quota
 from api.schemas.ingest import IngestResponse, JobStatusResponse, DocumentStatusResponse
 from services.ingest.service import IngestService
@@ -20,12 +20,12 @@ async def ingest_document(
     tenant_id: Optional[str] = Form(None),
     safe_mode: bool = Form(False),
     db: Session = Depends(get_db_lazy),
-    user: "User" = Depends(get_current_user),
+    user: dict = Depends(get_current_user_dict),
 ) -> IngestResponse:
     """Upload and ingest a document."""
     # Get user info
-    user_tenant_id = user.get("tenant_id")
-    user_id = user.get("user_id")
+    user_tenant_id = user["tenant_id"]
+    user_id = user["user_id"]
     
     # Use user's tenant_id if not provided
     if not tenant_id:

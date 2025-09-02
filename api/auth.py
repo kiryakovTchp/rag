@@ -43,8 +43,8 @@ async def get_current_user_ws(websocket: WebSocket) -> Optional[Dict[str, Any]]:
     except Exception:
         return None
 
-async def get_current_user(request: Request, db: Session = Depends(lambda: get_db_lazy())) -> Dict[str, Any]:
-    """Get current user from request."""
+async def get_current_user_dict(request: Request, db: Session = Depends(lambda: get_db_lazy())) -> Dict[str, Any]:
+    """Get current user from request as dictionary."""
     if not require_auth():
         return {
             "tenant_id": "anonymous",
@@ -93,7 +93,7 @@ async def get_current_user_optional(request: Request, db: Session = Depends(lamb
         }
     
     try:
-        return await get_current_user(request, db)
+        return await get_current_user_dict(request, db)
     except HTTPException:
         return None
 

@@ -15,7 +15,7 @@ from sqlalchemy.orm import Session
 security = HTTPBearer(auto_error=False)
 
 
-async def get_current_user_ws(websocket: WebSocket) -> Optional:
+async def get_current_user_ws(websocket: WebSocket) -> Optional["User"]:
     """Get current user from WebSocket connection."""
     try:
         # Get token from query params or headers
@@ -67,7 +67,7 @@ async def get_current_user_ws(websocket: WebSocket) -> Optional:
         return None
 
 
-async def get_current_user_api_key(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Optional:
+async def get_current_user_api_key(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Optional["User"]:
     """Get current user from API key."""
     if not credentials:
         return None
@@ -112,7 +112,7 @@ async def get_current_user_api_key(credentials: HTTPAuthorizationCredentials = D
         db.close()
 
 
-async def get_current_user_api_key_header(request: Request) -> Optional:
+async def get_current_user_api_key_header(request: Request) -> Optional["User"]:
     """Get current user from X-API-Key header."""
     api_key = request.headers.get("X-API-Key")
     if not api_key:
@@ -159,7 +159,7 @@ async def get_current_user_api_key_header(request: Request) -> Optional:
 async def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security)
-):
+) -> "User":
     """Get current user from JWT token or API key."""
     # Try API key from Bearer token first
     user = await get_current_user_api_key(credentials)
