@@ -7,48 +7,26 @@ from typing import List
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
-# Lazy imports to prevent startup failures
-# from db.session import get_db
-# from db.models import APIKey, User
 from api.dependencies.auth import get_current_user
+from api.dependencies.db import get_db_lazy
 from api.schemas.auth import APIKeyCreate, APIKeyResponse, APIKeyList
 
 router = APIRouter()
 
 
-def get_db_lazy():
-    """Lazy database dependency."""
-    try:
-        from db.session import get_db
-        return next(get_db())
-    except ImportError as e:
-        raise HTTPException(
-            status_code=503,
-            detail="Database service temporarily unavailable"
-        )
-
-
 @router.post("/api-keys", response_model=APIKeyResponse)
 async def create_api_key(
     api_key_data: APIKeyCreate,
-    current_user = Depends(get_current_user),
+    current_user: "User" = Depends(get_current_user),
     db: Session = Depends(get_db_lazy)
 ):
     """Create a new API key for the current user's tenant."""
-    # Lazy import database models
-    try:
-        from db.models import APIKey, User
-    except ImportError as e:
-        raise HTTPException(
-            status_code=503,
-            detail="Database service temporarily unavailable"
-        )
-    
     # Generate a secure random API key
     api_key = f"pk_{secrets.token_urlsafe(32)}"
     key_hash = hashlib.sha256(api_key.encode()).hexdigest()
     
     # Create API key record
+    from db.models import APIKey
     db_api_key = APIKey(
         key_hash=key_hash,
         tenant_id=current_user.tenant_id,
@@ -71,19 +49,11 @@ async def create_api_key(
 
 @router.get("/api-keys", response_model=List[APIKeyList])
 async def list_api_keys(
-    current_user = Depends(get_current_user),
+    current_user: "User" = Depends(get_current_user),
     db: Session = Depends(get_db_lazy)
 ):
     """List all API keys for the current user's tenant."""
-    # Lazy import database models
-    try:
-        from db.models import APIKey, User
-    except ImportError as e:
-        raise HTTPException(
-            status_code=503,
-            detail="Database service temporarily unavailable"
-        )
-    
+    from db.models import APIKey
     api_keys = db.query(APIKey).filter(
         APIKey.tenant_id == current_user.tenant_id,
         APIKey.revoked_at.is_(None)
@@ -103,19 +73,11 @@ async def list_api_keys(
 @router.delete("/api-keys/{key_id}")
 async def revoke_api_key(
     key_id: int,
-    current_user = Depends(get_current_user),
+    current_user: "User" = Depends(get_current_user),
     db: Session = Depends(get_db_lazy)
 ):
     """Revoke an API key."""
-    # Lazy import database models
-    try:
-        from db.models import APIKey, User
-    except ImportError as e:
-        raise HTTPException(
-            status_code=503,
-            detail="Database service temporarily unavailable"
-        )
-    
+    from db.models import APIKey
     api_key = db.query(APIKey).filter(
         APIKey.id == key_id,
         APIKey.tenant_id == current_user.tenant_id,
@@ -135,7 +97,7 @@ async def revoke_api_key(
 
 
 @router.get("/me")
-async def get_current_user_info(current_user = Depends(get_current_user)):
+async def get_current_user_info(current_user: "User" = Depends(get_current_user)):
     """Get current user information."""
     return {
         "id": current_user.id,

@@ -57,6 +57,7 @@ data/
 logs/
 .gradio/
 *.log
+reports/
 
 # Docker
 .dockerignore

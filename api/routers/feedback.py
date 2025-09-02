@@ -5,47 +5,25 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
 from api.dependencies.auth import get_current_user
+from api.dependencies.db import get_db_lazy
 from api.schemas.feedback import FeedbackCreate, FeedbackResponse
-# Lazy imports to prevent startup failures
-# from db.session import get_db
-# from db.models import AnswerFeedback, User
 
 router = APIRouter()
-
-
-def get_db_lazy():
-    """Lazy database dependency."""
-    try:
-        from db.session import get_db
-        return next(get_db())
-    except ImportError as e:
-        raise HTTPException(
-            status_code=503,
-            detail="Database service temporarily unavailable"
-        )
 
 
 @router.post("/feedback", response_model=FeedbackResponse)
 async def create_feedback(
     feedback_data: FeedbackCreate,
-    current_user = Depends(get_current_user),
+    current_user: "User" = Depends(get_current_user),
     db: Session = Depends(get_db_lazy)
 ):
     """Create feedback for an answer."""
-    # Lazy import database models
-    try:
-        from db.models import AnswerFeedback, User
-    except ImportError as e:
-        raise HTTPException(
-            status_code=503,
-            detail="Database service temporarily unavailable"
-        )
-    
     # Validate that the answer belongs to the user's tenant
     # Note: In a real implementation, you'd want to verify the answer_id exists
     # and belongs to the current tenant
     
     # Create feedback record
+    from db.models import AnswerFeedback
     feedback = AnswerFeedback(
         answer_id=feedback_data.answer_id,
         tenant_id=current_user.tenant_id,
@@ -74,19 +52,11 @@ async def create_feedback(
 @router.get("/feedback/{answer_id}", response_model=List[FeedbackResponse])
 async def get_feedback_for_answer(
     answer_id: str,
-    current_user = Depends(get_current_user),
+    current_user: "User" = Depends(get_current_user),
     db: Session = Depends(get_db_lazy)
 ):
     """Get all feedback for a specific answer."""
-    # Lazy import database models
-    try:
-        from db.models import AnswerFeedback, User
-    except ImportError as e:
-        raise HTTPException(
-            status_code=503,
-            detail="Database service temporarily unavailable"
-        )
-    
+    from db.models import AnswerFeedback
     feedback_list = db.query(AnswerFeedback).filter(
         AnswerFeedback.answer_id == answer_id,
         AnswerFeedback.tenant_id == current_user.tenant_id
@@ -109,21 +79,13 @@ async def get_feedback_for_answer(
 
 @router.get("/feedback", response_model=List[FeedbackResponse])
 async def get_feedback_summary(
-    current_user = Depends(get_current_user),
+    current_user: "User" = Depends(get_current_user),
     db: Session = Depends(get_db_lazy),
     limit: int = 100,
     offset: int = 0
 ):
     """Get feedback summary for the current tenant."""
-    # Lazy import database models
-    try:
-        from db.models import AnswerFeedback, User
-    except ImportError as e:
-        raise HTTPException(
-            status_code=503,
-            detail="Database service temporarily unavailable"
-        )
-    
+    from db.models import AnswerFeedback
     feedback_list = db.query(AnswerFeedback).filter(
         AnswerFeedback.tenant_id == current_user.tenant_id
     ).order_by(AnswerFeedback.created_at.desc()).offset(offset).limit(limit).all()

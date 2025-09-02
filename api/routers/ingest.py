@@ -3,7 +3,7 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from api.deps import get_db
+from api.dependencies.db import get_db_lazy
 from api.auth import get_current_user
 from api.middleware.rate_limit import check_quota
 from api.schemas.ingest import IngestResponse, JobStatusResponse, DocumentStatusResponse
@@ -12,7 +12,6 @@ from services.ingest.service import IngestService
 router = APIRouter()
 
 _DEFAULT_FILE = File(...)
-_GET_DB = Depends(get_db)
 
 
 @router.post("/ingest", response_model=IngestResponse)
@@ -20,8 +19,8 @@ async def ingest_document(
     file: UploadFile = _DEFAULT_FILE,
     tenant_id: Optional[str] = Form(None),
     safe_mode: bool = Form(False),
-    db: Session = _GET_DB,
-    user: dict = Depends(get_current_user),
+    db: Session = Depends(get_db_lazy),
+    user: "User" = Depends(get_current_user),
 ) -> IngestResponse:
     """Upload and ingest a document."""
     # Get user info
@@ -59,7 +58,7 @@ async def ingest_document(
 
 
 @router.get("/ingest/{job_id}", response_model=JobStatusResponse)
-async def get_job_status(job_id: int, db: Session = _GET_DB) -> JobStatusResponse:
+async def get_job_status(job_id: int, db: Session = Depends(get_db_lazy)) -> JobStatusResponse:
     """Get job status by ID."""
     service = IngestService(db)
     job = service.get_job_status(job_id)
@@ -80,7 +79,7 @@ async def get_job_status(job_id: int, db: Session = _GET_DB) -> JobStatusRespons
 
 
 @router.get("/ingest/document/{document_id}", response_model=DocumentStatusResponse)
-async def get_document_status(document_id: int, db: Session = _GET_DB) -> DocumentStatusResponse:
+async def get_document_status(document_id: int, db: Session = Depends(get_db_lazy)) -> DocumentStatusResponse:
     """Get document status with all jobs."""
     service = IngestService(db)
     document_status = service.get_document_status(document_id)

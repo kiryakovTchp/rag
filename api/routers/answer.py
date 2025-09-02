@@ -7,44 +7,21 @@ from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
 from api.dependencies.auth import get_current_user
+from api.dependencies.db import get_db_lazy
 from api.schemas.answer import AnswerRequest, AnswerResponse
 from api.middleware.rate_limit import check_quota, get_remaining_quota
 from services.answer.orchestrator import AnswerOrchestrator
-# Lazy imports to prevent startup failures
-# from db.session import get_db
-# from db.models import AnswerLog, User
 
 router = APIRouter()
-
-
-def get_db_lazy():
-    """Lazy database dependency."""
-    try:
-        from db.session import get_db
-        return next(get_db())
-    except ImportError as e:
-        raise HTTPException(
-            status_code=503,
-            detail="Database service temporarily unavailable"
-        )
 
 
 @router.post("/answer", response_model=AnswerResponse)
 async def generate_answer(
     request: AnswerRequest,
     db: Session = Depends(get_db_lazy),
-    user = Depends(get_current_user)
+    user: "User" = Depends(get_current_user)
 ) -> AnswerResponse:
     """Generate an answer to a query."""
-    # Lazy import database models
-    try:
-        from db.models import AnswerLog, User
-    except ImportError as e:
-        raise HTTPException(
-            status_code=503,
-            detail="Database service temporarily unavailable"
-        )
-    
     # Check daily quota (estimate tokens)
     estimated_tokens = len(request.query.split()) * 2  # Rough estimate
     if not check_quota(user.tenant_id, estimated_tokens):
@@ -72,6 +49,8 @@ async def generate_answer(
         # Log answer usage
         if result.get("usage"):
             usage = result["usage"]
+            # Lazy import for AnswerLog
+            from db.models import AnswerLog
             answer_log = AnswerLog(
                 tenant_id=user.tenant_id,
                 query=request.query,
@@ -113,18 +92,9 @@ async def generate_answer(
 async def stream_answer(
     request: AnswerRequest,
     db: Session = Depends(get_db_lazy),
-    user = Depends(get_current_user)
+    user: "User" = Depends(get_current_user)
 ) -> StreamingResponse:
     """Generate a streaming answer to a query."""
-    # Lazy import database models
-    try:
-        from db.models import AnswerLog, User
-    except ImportError as e:
-        raise HTTPException(
-            status_code=503,
-            detail="Database service temporarily unavailable"
-        )
-    
     # Check daily quota (estimate tokens)
     estimated_tokens = len(request.query.split()) * 2  # Rough estimate
     if not check_quota(user.tenant_id, estimated_tokens):
