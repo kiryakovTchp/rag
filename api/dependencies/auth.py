@@ -231,6 +231,40 @@ async def get_current_user(
         )
 
 
+async def auth_middleware(request: Request, call_next):
+    """Middleware to store user information in request.state."""
+    # Initialize user state
+    request.state.user = None
+    request.state.tenant_id = None
+    
+    try:
+        # Try to get user from various auth methods
+        from api.auth import get_current_user_dict
+        
+        # Skip auth for certain paths
+        if request.url.path in ["/healthz", "/docs", "/openapi.json"]:
+            response = await call_next(request)
+            return response
+        
+        # Try to get user dict
+        try:
+            user_dict = await get_current_user_dict(request, None)
+            if user_dict:
+                request.state.user = user_dict
+                request.state.tenant_id = user_dict.get("tenant_id")
+        except HTTPException:
+            # Auth failed, but continue with anonymous user
+            pass
+        
+        response = await call_next(request)
+        return response
+        
+    except Exception:
+        # If anything goes wrong, continue without user info
+        response = await call_next(request)
+        return response
+
+
 def require_auth() -> bool:
     """Check if authentication is required."""
     return os.getenv("REQUIRE_AUTH", "true").lower() == "true"

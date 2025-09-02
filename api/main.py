@@ -5,6 +5,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from api.middleware.rate_limit import rate_limit_middleware
+from api.dependencies.auth import auth_middleware
 
 from api.routers.health import router as health_router
 from api.routers.ingest import router as ingest_router
@@ -39,6 +40,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Add auth middleware to store user in request.state
+app.middleware("http")(auth_middleware)
 
 # Add rate limiting middleware
 app.middleware("http")(rate_limit_middleware)

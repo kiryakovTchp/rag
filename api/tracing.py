@@ -132,15 +132,7 @@ async def metrics_middleware(request: Request, call_next):
     start_time = time.time()
     
     # Extract tenant from request (if available)
-    tenant = "unknown"
-    try:
-        # Try to get tenant from various sources
-        if hasattr(request.state, "user") and request.state.user:
-            tenant = request.state.user.get("tenant_id", "unknown")
-        elif "x-tenant-id" in request.headers:
-            tenant = request.headers["x-tenant-id"]
-    except Exception:
-        tenant = "unknown"
+    tenant = getattr(request.state, "tenant_id", None) or request.headers.get("x-tenant-id", "unknown")
     
     # Extract route and method
     route = request.url.path
