@@ -4,7 +4,7 @@ import logging
 from db.models import Chunk, Document, Element, Job
 from db.session import SessionLocal
 from services.chunking.pipeline import ChunkingPipeline
-from services.events.bus import publish_event
+from services.events.bus import publish_event_sync
 from workers.app import celery_app
 
 logger = logging.getLogger(__name__)
@@ -34,16 +34,14 @@ def chunk_document(self, document_id: int, tenant_id: str = None) -> dict:
 
             # Emit WebSocket event
             if tenant_id:
-                asyncio.create_task(
-                    publish_event(
-                        f"{tenant_id}.jobs",
-                        {
-                            "event": "job_started",
-                            "job_id": job.id,
-                            "document_id": document_id,
-                            "type": "chunk",
-                        },
-                    )
+                publish_event_sync(
+                    f"{tenant_id}.jobs",
+                    {
+                        "event": "job_started",
+                        "job_id": job.id,
+                        "document_id": document_id,
+                        "type": "chunk",
+                    },
                 )
 
         # Get all elements for this document
@@ -78,17 +76,15 @@ def chunk_document(self, document_id: int, tenant_id: str = None) -> dict:
 
             # Emit WebSocket event
             if tenant_id:
-                asyncio.create_task(
-                    publish_event(
-                        f"{tenant_id}.jobs",
-                        {
-                            "event": "job_progress",
-                            "job_id": job.id,
-                            "document_id": document_id,
-                            "type": "chunk",
-                            "progress": 85,
-                        },
-                    )
+                publish_event_sync(
+                    f"{tenant_id}.jobs",
+                    {
+                        "event": "job_progress",
+                        "job_id": job.id,
+                        "document_id": document_id,
+                        "type": "chunk",
+                        "progress": 85,
+                    },
                 )
 
         # Save chunks to database
@@ -123,17 +119,15 @@ def chunk_document(self, document_id: int, tenant_id: str = None) -> dict:
 
             # Emit WebSocket event
             if tenant_id:
-                asyncio.create_task(
-                    publish_event(
-                        f"{tenant_id}.jobs",
-                        {
-                            "event": "chunk_done",
-                            "job_id": job.id,
-                            "document_id": document_id,
-                            "type": "chunk",
-                            "progress": 100,
-                        },
-                    )
+                publish_event_sync(
+                    f"{tenant_id}.jobs",
+                    {
+                        "event": "chunk_done",
+                        "job_id": job.id,
+                        "document_id": document_id,
+                        "type": "chunk",
+                        "progress": 100,
+                    },
                 )
 
         # Create embed job and trigger embedding task
@@ -166,17 +160,15 @@ def chunk_document(self, document_id: int, tenant_id: str = None) -> dict:
 
             # Emit WebSocket event
             if tenant_id:
-                asyncio.create_task(
-                    publish_event(
-                        f"{tenant_id}.jobs",
-                        {
-                            "event": "chunk_failed",
-                            "job_id": job.id,
-                            "document_id": document_id,
-                            "type": "chunk",
-                            "error": str(e),
-                        },
-                    )
+                publish_event_sync(
+                    f"{tenant_id}.jobs",
+                    {
+                        "event": "chunk_failed",
+                        "job_id": job.id,
+                        "document_id": document_id,
+                        "type": "chunk",
+                        "error": str(e),
+                    },
                 )
         raise
     finally:

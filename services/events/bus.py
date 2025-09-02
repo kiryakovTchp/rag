@@ -133,6 +133,23 @@ async def publish_event(topic: str, payload: Dict[str, Any]) -> bool:
     return await event_bus.publish_event(topic, payload)
 
 
+def publish_event_sync(topic: str, payload: Dict[str, Any]) -> bool:
+    """Synchronous version of publish_event for use in Celery tasks.
+    
+    Note: Celery tasks run outside an event loop, so we need to create one.
+    """
+    try:
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        result = loop.run_until_complete(event_bus.publish_event(topic, payload))
+        return result
+    except Exception as e:
+        logger.error(f"Failed to publish event synchronously to {topic}: {e}")
+        return False
+    finally:
+        loop.close()
+
+
 async def subscribe_loop(topic: str, handler: Callable[[Dict[str, Any]], None]) -> None:
     """Subscribe to topic with handler."""
     return await event_bus.subscribe_loop(topic, handler)

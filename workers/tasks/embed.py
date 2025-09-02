@@ -9,7 +9,7 @@ from celery import current_task
 from db.models import Document, Chunk, Job
 from db.session import SessionLocal
 from services.embed.provider import EmbeddingProvider
-from services.events.bus import publish_event
+from services.events.bus import publish_event_sync
 from services.index.pgvector import PGVectorIndex
 from workers.app import celery_app
 
@@ -53,17 +53,15 @@ def embed_document(self, document_id: int, tenant_id: str = None) -> dict:
 
         # Emit WebSocket event
         if tenant_id:
-            asyncio.create_task(
-                publish_event(
-                    f"{tenant_id}.jobs",
-                    {
-                        "event": "embed_started",
-                        "job_id": job.id,
-                        "document_id": document_id,
-                        "type": "embed",
-                        "progress": 0,
-                    },
-                )
+            publish_event_sync(
+                f"{tenant_id}.jobs",
+                {
+                    "event": "embed_started",
+                    "job_id": job.id,
+                    "document_id": document_id,
+                    "type": "embed",
+                    "progress": 0,
+                },
             )
 
         # 2) выбрать чанки без эмбеддингов или все (идемпотентно)
@@ -115,17 +113,15 @@ def embed_document(self, document_id: int, tenant_id: str = None) -> dict:
 
             # Emit WebSocket event
             if tenant_id:
-                asyncio.create_task(
-                    publish_event(
-                        f"{tenant_id}.jobs",
-                        {
-                            "event": "embed_progress",
-                            "job_id": job.id,
-                            "document_id": document_id,
-                            "type": "embed",
-                            "progress": progress,
-                        },
-                    )
+                publish_event_sync(
+                    f"{tenant_id}.jobs",
+                    {
+                        "event": "embed_progress",
+                        "job_id": job.id,
+                        "document_id": document_id,
+                        "type": "embed",
+                        "progress": progress,
+                    },
                 )
 
             logger.info(f"Processed {processed}/{total_chunks} chunks (progress: {progress}%)")
@@ -137,17 +133,15 @@ def embed_document(self, document_id: int, tenant_id: str = None) -> dict:
 
         # Emit WebSocket event
         if tenant_id:
-            asyncio.create_task(
-                publish_event(
-                    f"{tenant_id}.jobs",
-                    {
-                        "event": "embed_done",
-                        "job_id": job.id,
-                        "document_id": document_id,
-                        "type": "embed",
-                        "progress": 100,
-                    },
-                )
+            publish_event_sync(
+                f"{tenant_id}.jobs",
+                {
+                    "event": "embed_done",
+                    "job_id": job.id,
+                    "document_id": document_id,
+                    "type": "embed",
+                    "progress": 100,
+                },
             )
 
         logger.info(f"Completed embed job {job.id} for document {document_id}")
@@ -170,17 +164,15 @@ def embed_document(self, document_id: int, tenant_id: str = None) -> dict:
 
             # Emit WebSocket event
         if tenant_id:
-            asyncio.create_task(
-                publish_event(
-                    f"{tenant_id}.jobs",
-                    {
-                        "event": "embed_failed",
-                        "job_id": job.id,
-                        "document_id": document_id,
-                        "type": "embed",
-                        "error": str(e),
-                    },
-                )
+            publish_event_sync(
+                f"{tenant_id}.jobs",
+                {
+                    "event": "embed_failed",
+                    "job_id": job.id,
+                    "document_id": document_id,
+                    "type": "embed",
+                    "error": str(e),
+                },
             )
 
         raise

@@ -6,7 +6,7 @@ import tempfile
 # Lazy imports to prevent startup failures
 # from db.models import Document, Element, Job
 # from db.session import SessionLocal
-from services.events.bus import publish_event
+from services.events.bus import publish_event_sync
 from services.parsing.office import OfficeParser
 from services.parsing.pdf import PDFParser
 from services.parsing.tables import TableParser
@@ -49,17 +49,15 @@ def parse_document(self, document_id: int, tenant_id: str = None) -> dict:
 
             # Emit WebSocket event
             if tenant_id:
-                asyncio.create_task(
-                    publish_event(
-                        f"{tenant_id}.jobs",
-                        {
-                            "event": "parse_started",
-                            "job_id": job.id,
-                            "document_id": document_id,
-                            "type": "parse",
-                            "progress": 10,
-                        },
-                    )
+                publish_event_sync(
+                    f"{tenant_id}.jobs",
+                    {
+                        "event": "parse_started",
+                        "job_id": job.id,
+                        "document_id": document_id,
+                        "type": "parse",
+                        "progress": 10,
+                    },
                 )
 
         # Download file from S3
@@ -94,17 +92,15 @@ def parse_document(self, document_id: int, tenant_id: str = None) -> dict:
 
                 # Emit WebSocket event
                 if tenant_id:
-                    asyncio.create_task(
-                        publish_event(
-                            f"{tenant_id}.jobs",
-                            {
-                                "event": "parse_progress",
-                                "job_id": job.id,
-                                "document_id": document_id,
-                                "type": "parse",
-                                "progress": 50,
-                            },
-                        )
+                    publish_event_sync(
+                        f"{tenant_id}.jobs",
+                        {
+                            "event": "parse_progress",
+                            "job_id": job.id,
+                            "document_id": document_id,
+                            "type": "parse",
+                            "progress": 50,
+                        },
                     )
 
             # Extract tables if any
@@ -138,17 +134,15 @@ def parse_document(self, document_id: int, tenant_id: str = None) -> dict:
 
                 # Emit WebSocket event
                 if tenant_id:
-                    asyncio.create_task(
-                        publish_event(
-                            f"{tenant_id}.jobs",
-                            {
-                                "event": "parse_progress",
-                                "job_id": job.id,
-                                "document_id": document_id,
-                                "type": "parse",
-                                "progress": 70,
-                            },
-                        )
+                    publish_event_sync(
+                        f"{tenant_id}.jobs",
+                        {
+                            "event": "parse_progress",
+                            "job_id": job.id,
+                            "document_id": document_id,
+                            "type": "parse",
+                            "progress": 70,
+                        },
                     )
 
             # Create chunk job
@@ -166,17 +160,15 @@ def parse_document(self, document_id: int, tenant_id: str = None) -> dict:
 
                 # Emit WebSocket event
             if tenant_id:
-                asyncio.create_task(
-                    publish_event(
-                        f"{tenant_id}.jobs",
-                        {
-                            "event": "parse_done",
-                            "job_id": job.id,
-                            "document_id": document_id,
-                            "type": "parse",
-                            "progress": 100,
-                        },
-                    )
+                publish_event_sync(
+                    f"{tenant_id}.jobs",
+                    {
+                        "event": "parse_done",
+                        "job_id": job.id,
+                        "document_id": document_id,
+                        "type": "parse",
+                        "progress": 100,
+                    },
                 )
 
             # Trigger chunking task
@@ -207,17 +199,15 @@ def parse_document(self, document_id: int, tenant_id: str = None) -> dict:
 
             # Emit WebSocket event
             if tenant_id:
-                asyncio.create_task(
-                    publish_event(
-                        f"{tenant_id}.jobs",
-                        {
-                            "event": "parse_failed",
-                            "job_id": job.id,
-                            "document_id": document_id,
-                            "type": "parse",
-                            "error": str(e),
-                        },
-                    )
+                publish_event_sync(
+                    f"{tenant_id}.jobs",
+                    {
+                        "event": "parse_failed",
+                        "job_id": job.id,
+                        "document_id": document_id,
+                        "type": "parse",
+                        "error": str(e),
+                    },
                 )
         raise
     finally:
