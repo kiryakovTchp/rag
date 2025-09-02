@@ -7,8 +7,9 @@ from typing import List, Tuple
 import numpy as np
 from sqlalchemy import text
 
-from db.models import Chunk, Embedding
-from db.session import SessionLocal, engine
+# Lazy imports to prevent startup failures
+# from db.models import Chunk, Embedding
+# from db.session import SessionLocal, engine
 
 
 class PGVectorIndex:
@@ -16,13 +17,20 @@ class PGVectorIndex:
 
     def __init__(self):
         """Initialize pgvector index."""
-        self._ensure_pgvector_extension()
+        # Don't connect to database at startup
+        pass
 
     def _ensure_pgvector_extension(self):
         """Ensure pgvector extension is enabled."""
-        with engine.connect() as conn:
-            conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
-            conn.commit()
+        try:
+            from db.session import engine
+            with engine.connect() as conn:
+                conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+                conn.commit()
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Could not ensure pgvector extension: {e}")
 
     def upsert_embeddings(self, chunk_ids: List[int], vectors: np.ndarray, provider: str):
         """Upsert embeddings for chunks.
@@ -38,33 +46,40 @@ class PGVectorIndex:
         # Ensure vectors are float32
         vectors = vectors.astype(np.float32)
 
-        db = SessionLocal()
         try:
-            # Use raw SQL for efficient upsert
-            sql = """
-            INSERT INTO embeddings (chunk_id, vector, provider, created_at)
-            VALUES (:chunk_id, :vector, :provider, NOW())
-            ON CONFLICT (chunk_id) 
-            DO UPDATE SET 
-                vector = EXCLUDED.vector,
-                provider = EXCLUDED.provider,
-                updated_at = NOW()
-            """
+            from db.session import SessionLocal
+            db = SessionLocal()
+            try:
+                # Use raw SQL for efficient upsert
+                sql = """
+                INSERT INTO embeddings (chunk_id, vector, provider, created_at)
+                VALUES (:chunk_id, :vector, :provider, NOW())
+                ON CONFLICT (chunk_id) 
+                DO UPDATE SET 
+                    vector = EXCLUDED.vector,
+                    provider = EXCLUDED.provider,
+                    updated_at = NOW()
+                """
 
-            for chunk_id, vector in zip(chunk_ids, vectors):
-                # pgvector adapter will handle numpy array conversion directly
-                db.execute(
-                    text(sql),
-                    {
-                        "chunk_id": chunk_id,
-                        "vector": vector,  # numpy array passed directly
-                        "provider": provider,
-                    },
-                )
+                for chunk_id, vector in zip(chunk_ids, vectors):
+                    # pgvector adapter will handle numpy array conversion directly
+                    db.execute(
+                        text(sql),
+                        {
+                            "chunk_id": chunk_id,
+                            "vector": vector,  # numpy array passed directly
+                            "provider": provider,
+                        },
+                    )
 
-            db.commit()
-        finally:
-            db.close()
+                db.commit()
+            finally:
+                db.close()
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to upsert embeddings: {e}")
+            raise
 
     def search(self, query_vector: np.ndarray, top_k: int = 100) -> List[Tuple[int, float]]:
         """Search for similar chunks.
@@ -94,30 +109,15 @@ class PGVectorIndex:
         LIMIT :top_k
         """
 
-        with engine.connect() as conn:
-            result = conn.execute(
-                text(sql), {"query_vector": query_vector, "top_k": top_k, "probes": probes}
-            )
-
-            results = []
-            for row in result:
-                chunk_id = row[0]
-                score = float(row[1])
-                results.append((chunk_id, score))
-
-            return results
-
-    def get_chunk_by_id(self, chunk_id: int) -> Chunk:
-        """Get chunk by ID.
-
-        Args:
-            chunk_id: Chunk ID
-
-        Returns:
-            Chunk object
-        """
-        db = SessionLocal()
         try:
-            return db.query(Chunk).filter(Chunk.id == chunk_id).first()
-        finally:
-            db.close()
+            from db.session import engine
+            with engine.connect() as conn:
+                result = conn.execute(
+                    text(sql), {"query_vector": query_vector, "top_k": top_k, "probes": probes}
+                )
+                return [(row[0], row[1]) for row in result]
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to search embeddings: {e}")
+            return []

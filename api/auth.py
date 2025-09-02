@@ -8,8 +8,9 @@ from fastapi import HTTPException, Depends, Request, WebSocket, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
 
-from db.session import get_db
-from db.models import APIKey
+# Lazy imports to prevent startup failures
+# from db.session import get_db
+# from db.models import APIKey
 
 security = HTTPBearer(auto_error=False)
 
@@ -42,7 +43,7 @@ async def get_current_user_ws(websocket: WebSocket) -> Optional[Dict[str, Any]]:
     except Exception:
         return None
 
-async def get_current_user(request: Request, db: Session = Depends(get_db)) -> Dict[str, Any]:
+async def get_current_user(request: Request, db: Session = Depends(lambda: get_db_lazy())) -> Dict[str, Any]:
     """Get current user from request."""
     if not require_auth():
         return {
@@ -82,7 +83,7 @@ async def get_current_user(request: Request, db: Session = Depends(get_db)) -> D
         detail="Invalid token or API key"
     )
 
-async def get_current_user_optional(request: Request, db: Session = Depends(get_db)) -> Optional[Dict[str, Any]]:
+async def get_current_user_optional(request: Request, db: Session = Depends(lambda: get_db_lazy())) -> Optional[Dict[str, Any]]:
     """Get current user from request (optional)."""
     if not require_auth():
         return {
@@ -95,6 +96,17 @@ async def get_current_user_optional(request: Request, db: Session = Depends(get_
         return await get_current_user(request, db)
     except HTTPException:
         return None
+
+def get_db_lazy():
+    """Lazy database dependency."""
+    try:
+        from db.session import get_db
+        return next(get_db())
+    except ImportError as e:
+        raise HTTPException(
+            status_code=503,
+            detail="Database service temporarily unavailable"
+        )
 
 async def validate_jwt_token(token: str) -> Optional[Dict[str, Any]]:
     """Validate JWT token."""

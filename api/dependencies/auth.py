@@ -7,14 +7,15 @@ from fastapi import HTTPException, status, Depends, Request
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from fastapi.websockets import WebSocket
 
-from db.models import User, APIKey
-from db.session import get_db
+# Lazy imports to prevent startup failures
+# from db.models import User, APIKey
+# from db.session import get_db
 from sqlalchemy.orm import Session
 
 security = HTTPBearer(auto_error=False)
 
 
-async def get_current_user_ws(websocket: WebSocket) -> Optional[User]:
+async def get_current_user_ws(websocket: WebSocket) -> Optional:
     """Get current user from WebSocket connection."""
     try:
         # Get token from query params or headers
@@ -41,6 +42,15 @@ async def get_current_user_ws(websocket: WebSocket) -> Optional[User]:
             if not user_id or not tenant_id:
                 return None
             
+            # Lazy import database models
+            try:
+                from db.models import User
+            except ImportError as e:
+                raise HTTPException(
+                    status_code=503,
+                    detail="Database service temporarily unavailable"
+                )
+            
             # Create user object
             user = User(
                 id=user_id,
@@ -57,12 +67,22 @@ async def get_current_user_ws(websocket: WebSocket) -> Optional[User]:
         return None
 
 
-async def get_current_user_api_key(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Optional[User]:
+async def get_current_user_api_key(credentials: HTTPAuthorizationCredentials = Depends(security)) -> Optional:
     """Get current user from API key."""
     if not credentials:
         return None
     
     api_key = credentials.credentials
+    
+    # Lazy import database dependencies
+    try:
+        from db.models import User, APIKey
+        from db.session import get_db
+    except ImportError as e:
+        raise HTTPException(
+            status_code=503,
+            detail="Database service temporarily unavailable"
+        )
     
     # Get database session
     db = next(get_db())
@@ -92,11 +112,21 @@ async def get_current_user_api_key(credentials: HTTPAuthorizationCredentials = D
         db.close()
 
 
-async def get_current_user_api_key_header(request: Request) -> Optional[User]:
+async def get_current_user_api_key_header(request: Request) -> Optional:
     """Get current user from X-API-Key header."""
     api_key = request.headers.get("X-API-Key")
     if not api_key:
         return None
+    
+    # Lazy import database dependencies
+    try:
+        from db.models import User, APIKey
+        from db.session import get_db
+    except ImportError as e:
+        raise HTTPException(
+            status_code=503,
+            detail="Database service temporarily unavailable"
+        )
     
     # Get database session
     db = next(get_db())
@@ -129,7 +159,7 @@ async def get_current_user_api_key_header(request: Request) -> Optional[User]:
 async def get_current_user(
     request: Request,
     credentials: HTTPAuthorizationCredentials = Depends(security)
-) -> User:
+):
     """Get current user from JWT token or API key."""
     # Try API key from Bearer token first
     user = await get_current_user_api_key(credentials)
@@ -173,6 +203,15 @@ async def get_current_user(
                 status_code=status.HTTP_401_UNAUTHORIZED,
                 detail="Invalid token claims",
                 headers={"WWW-Authenticate": "Bearer"},
+            )
+        
+        # Lazy import database models
+        try:
+            from db.models import User
+        except ImportError as e:
+            raise HTTPException(
+                status_code=503,
+                detail="Database service temporarily unavailable"
             )
         
         # Create user object

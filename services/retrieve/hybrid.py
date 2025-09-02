@@ -1,12 +1,13 @@
 """Hybrid retriever with dense search and optional reranking."""
 
 from typing import List, Optional
+import os
 
 import numpy as np
 
-from db.models import Chunk
-from db.session import SessionLocal
-from services.embed.provider import EmbeddingProvider
+# Lazy imports to prevent startup failures
+# from db.models import Chunk
+# from db.session import SessionLocal
 from services.index.pgvector import PGVectorIndex
 from services.retrieve.rerank import WorkersAIReranker
 from services.retrieve.types import ChunkWithScore
@@ -15,11 +16,25 @@ from services.retrieve.types import ChunkWithScore
 class HybridRetriever:
     """Hybrid retriever combining dense search with optional reranking."""
     
-    def __init__(self):
+    def __init__(self, embed_provider: str = None):
         """Initialize hybrid retriever."""
-        self.embedder = EmbeddingProvider()
+        self.embed_provider = embed_provider or os.getenv("EMBED_PROVIDER", "workers_ai")
+        self._embedder = None
         self.index = PGVectorIndex()
         self.reranker = WorkersAIReranker()
+    
+    def _get_embedder(self):
+        """Lazy load embedding provider only when needed."""
+        if self._embedder is None:
+            try:
+                from services.embed.provider import EmbeddingProvider
+                self._embedder = EmbeddingProvider(self.embed_provider)
+            except ImportError as e:
+                raise ImportError(
+                    "Embedding service unavailable. "
+                    "Check EMBED_PROVIDER configuration."
+                ) from e
+        return self._embedder
     
     def retrieve(self, query: str, top_k: int = 100, rerank_k: int = 20, 
                  use_rerank: bool = False) -> List[ChunkWithScore]:
@@ -35,7 +50,8 @@ class HybridRetriever:
             List of chunks with scores
         """
         # Embed query
-        query_vector = self.embedder.embed_single(query)
+        embedder = self._get_embedder()
+        query_vector = embedder.embed_single(query)
         
         # Dense search
         search_results = self.index.search(query_vector, top_k)
@@ -59,7 +75,7 @@ class HybridRetriever:
         
         return results
     
-    def _get_chunks(self, chunk_ids: List[int]) -> List[Optional[Chunk]]:
+    def _get_chunks(self, chunk_ids: List[int]) -> List[Optional]:
         """Get chunks from database.
         
         Args:
@@ -68,16 +84,25 @@ class HybridRetriever:
         Returns:
             List of chunks (None if not found)
         """
-        db = SessionLocal()
         try:
-            chunks = db.query(Chunk).filter(Chunk.id.in_(chunk_ids)).all()
-            # Create mapping for efficient lookup
-            chunk_map = {chunk.id: chunk for chunk in chunks}
-            return [chunk_map.get(chunk_id) for chunk_id in chunk_ids]
-        finally:
-            db.close()
+            from db.models import Chunk
+            from db.session import SessionLocal
+            
+            db = SessionLocal()
+            try:
+                chunks = db.query(Chunk).filter(Chunk.id.in_(chunk_ids)).all()
+                # Create mapping for efficient lookup
+                chunk_map = {chunk.id: chunk for chunk in chunks}
+                return [chunk_map.get(chunk_id) for chunk_id in chunk_ids]
+            finally:
+                db.close()
+        except Exception as e:
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.error(f"Failed to get chunks from database: {e}")
+            return []
     
-    def _create_chunk_with_score(self, chunk: Chunk, score: float) -> ChunkWithScore:
+    def _create_chunk_with_score(self, chunk, score: float) -> ChunkWithScore:
         """Create ChunkWithScore from chunk and score.
         
         Args:

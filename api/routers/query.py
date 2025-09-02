@@ -8,7 +8,6 @@ from fastapi.responses import JSONResponse
 
 from api.schemas.query import QueryRequest, QueryResponse, QueryMatch, QueryUsage
 from services.chunking.token import TokenTextSplitter
-from services.retrieve.hybrid import HybridRetriever
 from services.retrieve.context_builder import ContextBuilder
 from services.retrieve.types import ChunkWithScore
 
@@ -25,8 +24,18 @@ async def query(request: QueryRequest) -> QueryResponse:
             detail="Reranking is not enabled. Set RERANK_ENABLED=true to enable."
         )
     
-    # Initialize services
-    retriever = HybridRetriever()
+    # Initialize services with lazy loading
+    try:
+        from services.retrieve.hybrid import HybridRetriever
+        retriever = HybridRetriever(
+            embed_provider=os.getenv("EMBED_PROVIDER", "workers_ai")
+        )
+    except ImportError as e:
+        raise HTTPException(
+            status_code=503,
+            detail="Retrieval service temporarily unavailable"
+        )
+    
     context_builder = ContextBuilder()
     token_splitter = TokenTextSplitter()
     

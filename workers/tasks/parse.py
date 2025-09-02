@@ -3,8 +3,9 @@ import logging
 import os
 import tempfile
 
-from db.models import Document, Element, Job
-from db.session import SessionLocal
+# Lazy imports to prevent startup failures
+# from db.models import Document, Element, Job
+# from db.session import SessionLocal
 from services.events.bus import publish_event
 from services.parsing.office import OfficeParser
 from services.parsing.pdf import PDFParser
@@ -18,6 +19,14 @@ logger = logging.getLogger(__name__)
 @celery_app.task(bind=True, queue="parse")
 def parse_document(self, document_id: int, tenant_id: str = None) -> dict:
     """Parse document into elements."""
+    # Lazy import database dependencies
+    try:
+        from db.models import Document, Element, Job
+        from db.session import SessionLocal
+    except ImportError as e:
+        logger.error(f"Database import failed: {e}")
+        raise ImportError("Database service temporarily unavailable") from e
+    
     logger.info(f"Starting parse task for document {document_id}")
     db = SessionLocal()
     storage = ObjectStore()

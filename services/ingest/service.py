@@ -6,7 +6,8 @@ from typing import Optional
 from fastapi import UploadFile
 from sqlalchemy.orm import Session
 
-from db.models import Document, Job
+# Lazy imports to prevent startup failures
+# from db.models import Document, Job
 from storage.r2 import ObjectStore
 from workers.tasks.parse import parse_document
 
@@ -25,6 +26,12 @@ class IngestService:
         Returns:
             int: The job ID for tracking progress
         """
+        # Lazy import database models
+        try:
+            from db.models import Document, Job
+        except ImportError as e:
+            raise ImportError("Database service temporarily unavailable") from e
+        
         # Save file to temporary location
         with tempfile.NamedTemporaryFile(delete=False) as temp_file:
             content = file.file.read()
@@ -63,13 +70,25 @@ class IngestService:
             # Clean up temporary file
             os.unlink(temp_file_path)
 
-    def get_job_status(self, job_id: int) -> Optional[Job]:
+    def get_job_status(self, job_id: int):
         """Get job status by ID."""
-        result: Optional[Job] = self.db.query(Job).filter(Job.id == job_id).first()
+        # Lazy import database models
+        try:
+            from db.models import Job
+        except ImportError as e:
+            raise ImportError("Database service temporarily unavailable") from e
+        
+        result = self.db.query(Job).filter(Job.id == job_id).first()
         return result
 
     def get_document_status(self, document_id: int):
         """Get document status with all jobs."""
+        # Lazy import database models
+        try:
+            from db.models import Document, Job
+        except ImportError as e:
+            raise ImportError("Database service temporarily unavailable") from e
+        
         from api.schemas.ingest import DocumentStatusResponse, JobInfo
         
         # Get document

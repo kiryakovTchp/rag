@@ -71,6 +71,8 @@ services:
       - REDIS_URL=${REDIS_URL}
       - CELERY_BROKER_URL=${REDIS_URL}/0
       - CELERY_RESULT_BACKEND=${REDIS_URL}/0
+      - EMBED_PROVIDER=${EMBED_PROVIDER:-workers_ai}
+      - EMBED_PROVIDER_FALLBACK=${EMBED_PROVIDER_FALLBACK:-true}
     volumes:
       - ./services:/app/services
       - ./workers:/app/workers

@@ -22,7 +22,7 @@ class ConnectionManager:
         self.active_connections: Dict[str, List[WebSocket]] = {}
         self._subscription_tasks: Dict[str, asyncio.Task] = {}
 
-        async def connect(self, websocket: WebSocket, tenant_id: str):
+    async def connect(self, websocket: WebSocket, tenant_id: str):
         """Connect a new WebSocket client and subscribe to Redis channel."""
         await websocket.accept()
         if tenant_id not in self.active_connections:
@@ -48,7 +48,7 @@ class ConnectionManager:
                 self._stop_subscription(tenant_id)
                 logger.info(f"WebSocket disconnected for tenant {tenant_id}")
 
-        async def _start_subscription(self, tenant_id: str):
+    async def _start_subscription(self, tenant_id: str):
         """Start Redis subscription for tenant."""
         if tenant_id in self._subscription_tasks:
             return

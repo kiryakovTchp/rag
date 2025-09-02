@@ -3,8 +3,6 @@
 import numpy as np
 from typing import List
 
-from sentence_transformers import SentenceTransformer
-
 
 class BGEM3Embedder:
     """BGE-M3 embedder using sentence-transformers."""
@@ -16,8 +14,18 @@ class BGEM3Embedder:
             batch_size: Batch size for embedding generation
         """
         self.batch_size = batch_size
-        self.model = SentenceTransformer('BAAI/bge-m3')
+        self.model = None
         self.dimension = 1024
+        
+        # Lazy import to avoid startup failures
+        try:
+            from sentence_transformers import SentenceTransformer
+            self.model = SentenceTransformer('BAAI/bge-m3')
+        except ImportError:
+            raise ValueError(
+                "Local embeddings require `sentence-transformers` and compatible deps. "
+                "Either install deps or set EMBED_PROVIDER=workers_ai."
+            )
     
     def embed_texts(self, texts: List[str]) -> np.ndarray:
         """Embed a list of texts.
