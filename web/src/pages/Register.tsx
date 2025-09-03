@@ -44,7 +44,7 @@ export function Register() {
     setLoading(true)
 
     try {
-      await register(formData.email, formData.password)
+      await register({ email: formData.email, password: formData.password })
       navigate('/dashboard')
     } catch (err) {
       setError('Произошла ошибка при регистрации')

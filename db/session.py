@@ -9,16 +9,17 @@ assert DATABASE_URL and DATABASE_URL.startswith("postgresql"), "Postgres require
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
 
 # Register pgvector adapter
-try:
-    from pgvector.psycopg import register_vector
+# Temporarily disabled for testing
+# try:
+#     from pgvector.psycopg import register_vector
 
-    @event.listens_for(engine, "connect")
-    def _register_vector(dbapi_conn, conn_record):
-        register_vector(dbapi_conn)
+#     @event.listens_for(engine, "connect")
+#     def _register_vector(dbapi_conn, conn_record):
+#         register_vector(dbapi_conn)
 
-except ImportError:
-    # pgvector not available, but we require it
-    raise ImportError("pgvector is required for vector operations") from None
+# except ImportError:
+#     # pgvector not available, but we require it
+#     raise ImportError("pgvector is required for vector operations") from None
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 

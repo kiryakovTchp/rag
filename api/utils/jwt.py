@@ -33,7 +33,7 @@ def create_access_token(data: dict, expires_delta: Optional[int] = None) -> str:
         raise ValueError("JWT_SECRET_KEY environment variable required")
 
     encoded_jwt = jwt.encode(to_encode, secret, algorithm="HS256")
-    return encoded_jwt
+    return str(encoded_jwt)
 
 
 def verify_token(token: str) -> Optional[dict]:

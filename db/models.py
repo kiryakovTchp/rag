@@ -8,6 +8,7 @@ from sqlalchemy import (
     Enum,
     ForeignKey,
     Integer,
+    MetaData,
     String,
     Text,
     func,
@@ -15,7 +16,6 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
-from sqlalchemy import MetaData
 
 metadata = MetaData(schema="app")
 Base = declarative_base(metadata=metadata)

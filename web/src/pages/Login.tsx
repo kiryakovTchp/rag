@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { Link, useNavigate, useLocation } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { Eye, EyeOff, ArrowLeft } from 'lucide-react'
 import { Button, Input, Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui'
@@ -14,9 +14,9 @@ export function Login() {
   
   const { login } = useAuth()
   const navigate = useNavigate()
-  const location = useLocation()
+
   
-  const from = location.state?.from?.pathname || '/dashboard'
+
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -25,7 +25,7 @@ export function Login() {
 
     try {
       await login(email, password)
-      navigate(from, { replace: true })
+      navigate('/dashboard', { replace: true })
     } catch (err) {
       setError('Неверный email или пароль')
     } finally {

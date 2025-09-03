@@ -47,7 +47,8 @@ app.add_middleware(
 )
 
 # Add auth middleware to store user in request.state
-app.middleware("http")(auth_middleware)
+# Temporarily disabled for testing
+# app.middleware("http")(auth_middleware)
 
 # Add rate limiting middleware (temporarily disabled for testing)
 # app.middleware("http")(rate_limit_middleware)

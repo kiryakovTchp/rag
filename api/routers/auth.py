@@ -19,7 +19,7 @@ from api.schemas.auth import (
     UserLogin,
     UserRegister,
 )
-from api.utils.jwt import create_access_token
+from api.utils.jwt import create_user_token
 from api.utils.password import hash_password, verify_password
 
 router = APIRouter()
@@ -74,18 +74,13 @@ async def login(user_data: UserLogin, db: Session = Depends(get_db)):  # noqa: B
         )
 
     # Verify password
-    if not verify_password(user_data.password, str(user.password_hash)):
+    if not verify_password(user_data.password, str(user.hashed_password)):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password"
         )
 
     # Create access token
-    access_token = create_access_token(
-        user_id=int(user.id),
-        email=str(user.email),
-        tenant_id=str(user.tenant_id) if user.tenant_id else None,
-        role=str(user.role),
-    )
+    access_token = create_user_token(user)
 
     return TokenResponse(access_token=access_token)
 

@@ -22,7 +22,7 @@ import {
 } from '@/components/ui'
 import { AppShell } from '@/components/AppShell'
 import { useAuth } from '@/hooks/useAuth.tsx'
-import { apiService } from '@/services/api'
+import apiClient from '@/services/apiClient'
 import { SearchQuery, SearchResult } from '@/types'
 
 export function SearchPage() {
@@ -52,7 +52,7 @@ export function SearchPage() {
         tenant_id: user?.tenant_id
       }
 
-      const response = await apiService.search(searchQuery)
+              const response = await apiClient.post('/query', searchQuery).then(res => res.data)
       setResults(response.matches)
     } catch (error) {
       console.error('Search failed:', error)

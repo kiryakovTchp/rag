@@ -21,7 +21,7 @@ import {
 } from '@/components/ui'
 import { AppShell } from '@/components/AppShell'
 import { useAuth } from '@/hooks/useAuth.tsx'
-import { apiService } from '@/services/api'
+import apiClient from '@/services/apiClient'
 import { Document, Job, Usage } from '@/types'
 
 export function Dashboard() {
@@ -38,9 +38,9 @@ export function Dashboard() {
         
         // Load documents, jobs, and usage in parallel
         const [docsData, jobsData, usageData] = await Promise.allSettled([
-          apiService.getDocuments(),
-          apiService.getJobs(),
-          apiService.getUsage()
+          apiClient.get('/documents').then(res => res.data),
+          apiClient.get('/jobs').then(res => res.data),
+          apiClient.get('/usage').then(res => res.data)
         ])
 
         if (docsData.status === 'fulfilled') {

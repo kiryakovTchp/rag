@@ -23,7 +23,7 @@ import {
 } from '@/components/ui'
 import { AppShell } from '@/components/AppShell'
 
-import { apiService } from '@/services/api'
+import apiClient from '@/services/apiClient'
 import { Document } from '@/types'
 
 export function Documents() {
@@ -42,7 +42,7 @@ export function Documents() {
   const loadDocuments = async () => {
     try {
       setLoading(true)
-      const docs = await apiService.getDocuments()
+              const docs = await apiClient.get('/documents').then(res => res.data)
       setDocuments(docs)
     } catch (error) {
       console.error('Failed to load documents:', error)
@@ -66,7 +66,11 @@ export function Documents() {
       const formData = new FormData()
       formData.append('file', selectedFile)
       
-      const result = await apiService.uploadDocument(formData)
+              const result = await apiClient.post('/ingest', formData, {
+          headers: {
+            'Content-Type': 'multipart/form-data'
+          }
+        }).then(res => res.data)
       
       // Add new document to list
       setDocuments(prev => [result.document, ...prev])
