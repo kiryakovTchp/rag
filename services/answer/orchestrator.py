@@ -59,7 +59,7 @@ class AnswerOrchestrator:
         Raises:
             Exception: If no relevant context found or generation fails
         """
-        start_time = time.time()
+        # start_time = time.time()  # Unused variable
 
         # Check cache first
         model = model or "gemini-2.5-flash"
@@ -150,12 +150,12 @@ class AnswerOrchestrator:
                 self.db,
                 tenant_id=tenant_id,
                 query=query,
-                provider=usage["provider"],
-                model=usage["model"],
-                in_tokens=usage["in_tokens"],
-                out_tokens=usage["out_tokens"],
-                latency_ms=usage["latency_ms"],
-                cost_usd=usage.get("cost_usd"),
+                provider=str(usage["provider"]),
+                model=str(usage["model"]),
+                in_tokens=int(usage["in_tokens"]) if usage["in_tokens"] is not None else None,
+                out_tokens=int(usage["out_tokens"]) if usage["out_tokens"] is not None else None,
+                latency_ms=int(usage["latency_ms"]),
+                cost_usd=float(usage["cost_usd"]) if usage.get("cost_usd") is not None else None,
             )
 
         return {"answer": answer, "citations": citations, "usage": usage}
@@ -277,12 +277,12 @@ class AnswerOrchestrator:
                 self.db,
                 tenant_id=tenant_id,
                 query=query,
-                provider=usage["provider"],
-                model=usage["model"],
-                in_tokens=usage["in_tokens"],
-                out_tokens=usage["out_tokens"],
-                latency_ms=usage["latency_ms"],
-                cost_usd=usage.get("cost_usd"),
+                provider=str(usage["provider"]),
+                model=str(usage["model"]),
+                in_tokens=int(usage["in_tokens"]) if usage["in_tokens"] is not None else None,
+                out_tokens=int(usage["out_tokens"]) if usage["out_tokens"] is not None else None,
+                latency_ms=int(usage["latency_ms"]),
+                cost_usd=float(usage["cost_usd"]) if usage.get("cost_usd") is not None else None,
             )
 
         # Yield final data

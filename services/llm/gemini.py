@@ -6,8 +6,14 @@ import time
 from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 
-from google import genai
-from google.generativeai import types
+try:
+    from google import genai  # для пакета google-genai
+    from google.genai import types  # types находится в google.genai
+except ImportError:
+    # Если google-genai не установлен, создаем заглушки
+    genai = None
+    types = None
+    raise ImportError("google-genai package is required. Install with: pip install google-genai")
 
 from services.llm.base import LLMProvider
 
@@ -19,9 +25,9 @@ class GeminiProvider(LLMProvider):
 
     def __init__(self):
         """Initialize Gemini provider."""
-        api_key = os.getenv("GOOGLE_API_KEY")
+        api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         if not api_key:
-            raise ValueError("GOOGLE_API_KEY environment variable required")
+            raise ValueError("GOOGLE_API_KEY or GEMINI_API_KEY environment variable required")
 
         genai.configure(api_key=api_key)
         self.executor = ThreadPoolExecutor(max_workers=4)
@@ -35,7 +41,7 @@ class GeminiProvider(LLMProvider):
         Returns:
             List of Gemini Content objects
         """
-        gemini_messages = []
+        gemini_messages: list = []
 
         for message in messages:
             role = message.get("role", "user")
@@ -90,9 +96,9 @@ class GeminiProvider(LLMProvider):
             gemini_messages = self._prepare_messages(messages)
 
             # Configure generation
-            config = types.GenerationConfig(
-                max_output_tokens=max_tokens, temperature=temperature
-            )
+            # config = types.GenerationConfig(
+            #     max_output_tokens=max_tokens, temperature=temperature
+            # )
 
             # Generate response
             start_time = time.time()

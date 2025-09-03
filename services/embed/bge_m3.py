@@ -27,7 +27,7 @@ class BGEM3Embedder:
             raise ValueError(
                 "Local embeddings require `sentence-transformers` and compatible deps. "
                 "Either install deps or set EMBED_PROVIDER=workers_ai."
-            )
+            ) from None
 
     def embed_texts(self, texts: List[str]) -> np.ndarray:
         """Embed a list of texts.

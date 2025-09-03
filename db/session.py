@@ -5,7 +5,7 @@ from sqlalchemy.orm import sessionmaker
 
 DATABASE_URL = os.getenv("DATABASE_URL")
 assert DATABASE_URL and DATABASE_URL.startswith(
-    "postgresql+psycopg"
+    "postgresql"
 ), "Postgres required"
 
 engine = create_engine(DATABASE_URL, pool_pre_ping=True)
@@ -20,7 +20,7 @@ try:
 
 except ImportError:
     # pgvector not available, but we require it
-    raise ImportError("pgvector is required for vector operations")
+    raise ImportError("pgvector is required for vector operations") from None
 
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
 

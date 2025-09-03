@@ -32,7 +32,7 @@ async def query(request: QueryRequest) -> QueryResponse:
     except ImportError:
         raise HTTPException(
             status_code=503, detail="Retrieval service temporarily unavailable"
-        )
+        ) from None
 
     context_builder = ContextBuilder()
     token_splitter = TokenTextSplitter()

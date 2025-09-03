@@ -156,7 +156,7 @@ class AnswerCache:
                     memory = self.redis.memory_usage(key)
                     if memory:
                         total_memory += memory
-                except:
+                except Exception:
                     pass
 
             return {

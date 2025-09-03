@@ -8,10 +8,11 @@ RUN apt-get update && apt-get install -y \
     libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-# Копируем requirements.txt и constraints.txt, устанавливаем зависимости
-COPY requirements.txt constraints.txt ./
+# Копируем requirements.txt, устанавливаем зависимости
+COPY requirements.txt ./
+COPY .env ./
 ENV PIP_ONLY_BINARY=tokenizers,numpy,sentencepiece
-RUN pip install --no-cache-dir -r requirements.txt -c constraints.txt
+RUN pip install --no-cache-dir -r requirements.txt
 
 # Копируем файлы с сохранением структуры
 COPY api/ /app/api/
@@ -19,6 +20,7 @@ COPY services/ /app/services/
 COPY db/ /app/db/
 COPY storage/ /app/storage/
 COPY workers/ /app/workers/
+COPY scripts/ /app/scripts/
 
 # Устанавливаем рабочую директорию
 WORKDIR /app

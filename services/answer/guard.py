@@ -2,6 +2,7 @@
 
 import os
 import re
+from typing import Optional
 
 
 class AnswerGuard:
@@ -92,7 +93,7 @@ class AnswerGuard:
         if timeout_s < 1 or timeout_s > 120:
             raise ValueError("timeout_s must be between 1 and 120")
 
-    def get_rate_limit_key(self, tenant_id: str = None) -> str:
+    def get_rate_limit_key(self, tenant_id: Optional[str] = None) -> str:
         """Get rate limit key for tenant.
 
         Args:

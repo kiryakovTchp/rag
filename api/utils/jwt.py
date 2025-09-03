@@ -28,9 +28,9 @@ def create_access_token(data: dict, expires_delta: Optional[int] = None) -> str:
 
     to_encode.update({"exp": expire})
 
-    secret = os.getenv("NEXTAUTH_SECRET")
+    secret = os.getenv("JWT_SECRET_KEY")
     if not secret:
-        raise ValueError("NEXTAUTH_SECRET environment variable required")
+        raise ValueError("JWT_SECRET_KEY environment variable required")
 
     encoded_jwt = jwt.encode(to_encode, secret, algorithm="HS256")
     return encoded_jwt
@@ -46,7 +46,7 @@ def verify_token(token: str) -> Optional[dict]:
         Decoded token data or None if invalid
     """
     try:
-        secret = os.getenv("NEXTAUTH_SECRET")
+        secret = os.getenv("JWT_SECRET_KEY")
         if not secret:
             return None
 
@@ -54,6 +54,18 @@ def verify_token(token: str) -> Optional[dict]:
         return payload
     except jwt.PyJWTError:
         return None
+
+
+def decode_token(token: str) -> Optional[dict]:
+    """Decode JWT token (alias for verify_token).
+
+    Args:
+        token: JWT token to decode
+
+    Returns:
+        Decoded token data or None if invalid
+    """
+    return verify_token(token)
 
 
 def create_user_token(user: User) -> str:

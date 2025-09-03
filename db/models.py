@@ -21,6 +21,7 @@ Base = declarative_base()
 
 class Document(Base):
     __tablename__ = "documents"
+    __table_args__ = {'schema': 'app'}
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
@@ -37,6 +38,7 @@ class Document(Base):
 
 class Job(Base):
     __tablename__ = "jobs"
+    __table_args__ = {'schema': 'app'}
 
     id = Column(Integer, primary_key=True, index=True)
     type = Column(String(50), nullable=False)  # parse, chunk
@@ -53,6 +55,7 @@ class Job(Base):
 
 class Element(Base):
     __tablename__ = "elements"
+    __table_args__ = {'schema': 'app'}
 
     id = Column(Integer, primary_key=True, index=True)
     document_id = Column(Integer, ForeignKey("documents.id"), nullable=False)
@@ -69,6 +72,7 @@ class Element(Base):
 
 class Chunk(Base):
     __tablename__ = "chunks"
+    __table_args__ = {'schema': 'app'}
 
     id = Column(Integer, primary_key=True, index=True)
     document_id = Column(Integer, ForeignKey("documents.id"), nullable=False)
@@ -87,6 +91,7 @@ class Chunk(Base):
 
 class Embedding(Base):
     __tablename__ = "embeddings"
+    __table_args__ = {'schema': 'app'}
 
     chunk_id = Column(
         Integer, ForeignKey("chunks.id", ondelete="CASCADE"), primary_key=True
@@ -101,10 +106,11 @@ class Embedding(Base):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = {'schema': 'app'}
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), nullable=False, unique=True, index=True)
-    password_hash = Column(String(255), nullable=False)
+    password_hash = Column("hashed_password", String(255), nullable=False)
     tenant_id = Column(String(100), nullable=True, index=True)
     role = Column(String(50), default="user")
     created_at = Column(
@@ -114,6 +120,7 @@ class User(Base):
 
 class AnswerLog(Base):
     __tablename__ = "answer_logs"
+    __table_args__ = {'schema': 'app'}
 
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(String(100), nullable=True)
@@ -129,6 +136,7 @@ class AnswerLog(Base):
 
 class APIKey(Base):
     __tablename__ = "api_keys"
+    __table_args__ = {'schema': 'app'}
 
     id = Column(Integer, primary_key=True, index=True)
     key_hash = Column(String(255), nullable=False, unique=True, index=True)
@@ -149,6 +157,7 @@ class APIKey(Base):
 
 class AnswerFeedback(Base):
     __tablename__ = "answer_feedback"
+    __table_args__ = {'schema': 'app'}
 
     id = Column(Integer, primary_key=True, index=True)
     answer_id = Column(String(100), nullable=False, index=True)

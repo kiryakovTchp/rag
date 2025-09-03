@@ -5,7 +5,7 @@ import os
 from typing import Any, Optional
 
 import jwt
-from fastapi import Depends, HTTPException, Request, WebSocket, status
+from fastapi import HTTPException, Request, WebSocket, status
 from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 
@@ -58,8 +58,10 @@ async def get_current_user_ws(websocket: WebSocket) -> Optional[dict[str, Any]]:
 
 
 async def get_current_user_dict(
-    request: Request, db: Session = Depends(get_db_lazy)
+    request: Request, db: Session = None
 ) -> dict[str, Any]:
+    if db is None:
+        db = next(get_db_lazy())
     """Get current user from request as dictionary.
 
     Returns:
@@ -103,8 +105,10 @@ async def get_current_user_dict(
 
 
 async def get_current_user_optional(
-    request: Request, db: Session = Depends(get_db_lazy)
+    request: Request, db: Session = None
 ) -> Optional[dict[str, Any]]:
+    if db is None:
+        db = next(get_db_lazy())
     """Get current user from request (optional)."""
     if not require_auth():
         return {"tenant_id": "anonymous", "user_id": "anonymous", "role": "user"}

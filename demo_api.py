@@ -63,7 +63,7 @@ async def search(query: str, top_k: int = 10):
 
     except Exception as e:
         logger.error(f"Search failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.post("/search/rerank")
@@ -100,7 +100,7 @@ async def search_with_rerank(query: str, top_k: int = 10, rerank_k: int = 5):
 
     except Exception as e:
         logger.error(f"Search with rerank failed: {e}")
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=str(e)) from e
 
 
 @app.exception_handler(Exception)
