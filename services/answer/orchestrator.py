@@ -152,10 +152,16 @@ class AnswerOrchestrator:
                 query=query,
                 provider=str(usage["provider"]),
                 model=str(usage["model"]),
-                in_tokens=int(usage["in_tokens"]) if usage["in_tokens"] is not None else None,
-                out_tokens=int(usage["out_tokens"]) if usage["out_tokens"] is not None else None,
+                in_tokens=int(usage["in_tokens"])
+                if usage["in_tokens"] is not None
+                else None,
+                out_tokens=int(usage["out_tokens"])
+                if usage["out_tokens"] is not None
+                else None,
                 latency_ms=int(usage["latency_ms"]),
-                cost_usd=float(usage["cost_usd"]) if usage.get("cost_usd") is not None else None,
+                cost_usd=float(usage["cost_usd"])
+                if usage.get("cost_usd") is not None
+                else None,
             )
 
         return {"answer": answer, "citations": citations, "usage": usage}
@@ -279,10 +285,16 @@ class AnswerOrchestrator:
                 query=query,
                 provider=str(usage["provider"]),
                 model=str(usage["model"]),
-                in_tokens=int(usage["in_tokens"]) if usage["in_tokens"] is not None else None,
-                out_tokens=int(usage["out_tokens"]) if usage["out_tokens"] is not None else None,
+                in_tokens=int(usage["in_tokens"])
+                if usage["in_tokens"] is not None
+                else None,
+                out_tokens=int(usage["out_tokens"])
+                if usage["out_tokens"] is not None
+                else None,
                 latency_ms=int(usage["latency_ms"]),
-                cost_usd=float(usage["cost_usd"]) if usage.get("cost_usd") is not None else None,
+                cost_usd=float(usage["cost_usd"])
+                if usage.get("cost_usd") is not None
+                else None,
             )
 
         # Yield final data

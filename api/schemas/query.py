@@ -1,7 +1,8 @@
 """Query schemas."""
 
-from pydantic import BaseModel
 from typing import List, Optional
+
+from pydantic import BaseModel
 
 
 class QueryRequest(BaseModel):

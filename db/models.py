@@ -15,13 +15,14 @@ from sqlalchemy import (
 )
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from sqlalchemy import MetaData
 
-Base = declarative_base()
+metadata = MetaData(schema="app")
+Base = declarative_base(metadata=metadata)
 
 
 class Document(Base):
     __tablename__ = "documents"
-    __table_args__ = {'schema': 'app'}
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(255), nullable=False)
@@ -38,14 +39,13 @@ class Document(Base):
 
 class Job(Base):
     __tablename__ = "jobs"
-    __table_args__ = {'schema': 'app'}
 
     id = Column(Integer, primary_key=True, index=True)
     type = Column(String(50), nullable=False)  # parse, chunk
     status = Column(String(50), default="queued")  # queued, running, done, error
     progress = Column(Integer, default=0)  # 0-100
     error = Column(Text, nullable=True)
-    document_id = Column(Integer, ForeignKey("documents.id"), nullable=False)
+    document_id = Column(Integer, ForeignKey("app.documents.id"), nullable=False)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
@@ -55,7 +55,6 @@ class Job(Base):
 
 class Element(Base):
     __tablename__ = "elements"
-    __table_args__ = {'schema': 'app'}
 
     id = Column(Integer, primary_key=True, index=True)
     document_id = Column(Integer, ForeignKey("documents.id"), nullable=False)
@@ -72,11 +71,10 @@ class Element(Base):
 
 class Chunk(Base):
     __tablename__ = "chunks"
-    __table_args__ = {'schema': 'app'}
 
     id = Column(Integer, primary_key=True, index=True)
-    document_id = Column(Integer, ForeignKey("documents.id"), nullable=False)
-    element_id = Column(Integer, ForeignKey("elements.id"), nullable=True)
+    document_id = Column(Integer, ForeignKey("app.documents.id"), nullable=False)
+    element_id = Column(Integer, ForeignKey("app.elements.id"), nullable=True)
     level = Column(String(50), nullable=False)  # section, passage, table
     header_path = Column(JSON, nullable=True)  # breadcrumbs path
     text = Column(Text, nullable=False)
@@ -91,10 +89,9 @@ class Chunk(Base):
 
 class Embedding(Base):
     __tablename__ = "embeddings"
-    __table_args__ = {'schema': 'app'}
 
     chunk_id = Column(
-        Integer, ForeignKey("chunks.id", ondelete="CASCADE"), primary_key=True
+        Integer, ForeignKey("app.chunks.id", ondelete="CASCADE"), primary_key=True
     )
     vector = Column(Vector(1024), nullable=False, index=False)  # pgvector vector(1024)
     provider = Column(String(50), nullable=False)  # local, workers_ai
@@ -106,11 +103,10 @@ class Embedding(Base):
 
 class User(Base):
     __tablename__ = "users"
-    __table_args__ = {'schema': 'app'}
 
     id = Column(Integer, primary_key=True, index=True)
     email = Column(String(255), nullable=False, unique=True, index=True)
-    password_hash = Column("hashed_password", String(255), nullable=False)
+    hashed_password = Column(String(255), nullable=False)
     tenant_id = Column(String(100), nullable=True, index=True)
     role = Column(String(50), default="user")
     created_at = Column(
@@ -120,7 +116,6 @@ class User(Base):
 
 class AnswerLog(Base):
     __tablename__ = "answer_logs"
-    __table_args__ = {'schema': 'app'}
 
     id = Column(Integer, primary_key=True, index=True)
     tenant_id = Column(String(100), nullable=True)
@@ -136,7 +131,6 @@ class AnswerLog(Base):
 
 class APIKey(Base):
     __tablename__ = "api_keys"
-    __table_args__ = {'schema': 'app'}
 
     id = Column(Integer, primary_key=True, index=True)
     key_hash = Column(String(255), nullable=False, unique=True, index=True)
@@ -157,7 +151,6 @@ class APIKey(Base):
 
 class AnswerFeedback(Base):
     __tablename__ = "answer_feedback"
-    __table_args__ = {'schema': 'app'}
 
     id = Column(Integer, primary_key=True, index=True)
     answer_id = Column(String(100), nullable=False, index=True)

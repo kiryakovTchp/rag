@@ -14,6 +14,7 @@ sys.path.append(str(Path(__file__).parent.parent))
 
 # Загружаем переменные окружения
 from dotenv import load_dotenv
+
 load_dotenv()
 
 from passlib.context import CryptContext
@@ -52,7 +53,9 @@ async def create_test_user() -> None:
         db = SessionLocal()
 
         # Проверяем, существует ли уже пользователь
-        existing_user = db.query(User).filter(User.email == test_user_data["email"]).first()
+        existing_user = (
+            db.query(User).filter(User.email == test_user_data["email"]).first()
+        )
 
         if existing_user:
             print(f"✅ Пользователь {test_user_data['email']} уже существует")
@@ -63,7 +66,7 @@ async def create_test_user() -> None:
 
         new_user = User(
             email=str(test_user_data["email"]),
-            password_hash=hashed_password,
+            hashed_password=hashed_password,
             tenant_id=str(test_user_data["tenant_id"]),
             role=str(test_user_data["role"]),
         )

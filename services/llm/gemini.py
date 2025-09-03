@@ -13,7 +13,9 @@ except ImportError:
     # Если google-genai не установлен, создаем заглушки
     genai = None
     types = None
-    raise ImportError("google-genai package is required. Install with: pip install google-genai")
+    raise ImportError(
+        "google-genai package is required. Install with: pip install google-genai"
+    )
 
 from services.llm.base import LLMProvider
 
@@ -27,7 +29,9 @@ class GeminiProvider(LLMProvider):
         """Initialize Gemini provider."""
         api_key = os.getenv("GOOGLE_API_KEY") or os.getenv("GEMINI_API_KEY")
         if not api_key:
-            raise ValueError("GOOGLE_API_KEY or GEMINI_API_KEY environment variable required")
+            raise ValueError(
+                "GOOGLE_API_KEY or GEMINI_API_KEY environment variable required"
+            )
 
         genai.configure(api_key=api_key)
         self.executor = ThreadPoolExecutor(max_workers=4)

@@ -2,12 +2,13 @@
 
 import os
 from typing import Any, Optional
-from sqlalchemy.orm import Session
 
 import jwt
 from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.websockets import WebSocket
+from sqlalchemy.orm import Session
+
 from api.dependencies.db import get_db_lazy
 
 # Lazy imports to prevent startup failures
@@ -283,6 +284,7 @@ async def validate_api_key(api_key: str, db: Session) -> Optional[dict[str, Any]
     """Validate API key."""
     # Hash the API key
     import hashlib
+
     key_hash = hashlib.sha256(api_key.encode()).hexdigest()
 
     # Check if key exists and is not revoked

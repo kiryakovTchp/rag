@@ -57,9 +57,7 @@ async def get_current_user_ws(websocket: WebSocket) -> Optional[dict[str, Any]]:
         return None
 
 
-async def get_current_user_dict(
-    request: Request, db: Session = None
-) -> dict[str, Any]:
+async def get_current_user_dict(request: Request, db: Session = None) -> dict[str, Any]:
     if db is None:
         db = next(get_db_lazy())
     """Get current user from request as dictionary.
