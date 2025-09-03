@@ -1,5 +1,5 @@
-from test import TestCase, fill_redis_with_vectors, generate_random_vector
 import random
+from test import TestCase, fill_redis_with_vectors, generate_random_vector
 
 """
 A note about this test:
@@ -22,7 +22,9 @@ class VREM(TestCase):
     def estimated_runtime(self):
         return 2.0
 
-    def format_neighbors_with_scores(self, links_result, old_links=None, items_to_remove=None):
+    def format_neighbors_with_scores(
+        self, links_result, old_links=None, items_to_remove=None
+    ):
         """Format neighbors with their similarity scores and status indicators"""
         if not links_result:
             return "No neighbors"
@@ -36,7 +38,9 @@ class VREM(TestCase):
             neighbors_with_scores = []
             for i in range(0, len(neighbors), 2):
                 neighbor = (
-                    neighbors[i].decode() if isinstance(neighbors[i], bytes) else neighbors[i]
+                    neighbors[i].decode()
+                    if isinstance(neighbors[i], bytes)
+                    else neighbors[i]
                 )
                 score = float(neighbors[i + 1]) if i + 1 < len(neighbors) else None
                 status = ""
@@ -50,7 +54,8 @@ class VREM(TestCase):
                     was_present = False
                     if old_links and level < len(old_links):
                         old_neighbors = [
-                            n.decode() if isinstance(n, bytes) else n for n in old_links[level]
+                            n.decode() if isinstance(n, bytes) else n
+                            for n in old_links[level]
                         ]
                         was_present = neighbor in old_neighbors
                     if not was_present:
@@ -98,7 +103,9 @@ class VREM(TestCase):
         # Store the graph structure for all items before deletion
         neighbors_before = {}
         for item, _ in items:
-            links = self.redis.execute_command("VLINKS", self.test_key, item, "WITHSCORES")
+            links = self.redis.execute_command(
+                "VLINKS", self.test_key, item, "WITHSCORES"
+            )
             if links:  # Some items might not have links
                 neighbors_before[item] = links
 

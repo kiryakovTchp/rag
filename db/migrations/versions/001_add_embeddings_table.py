@@ -6,9 +6,8 @@ Create Date: 2025-08-30 23:55:00.000000
 
 """
 
-from alembic import op
 import sqlalchemy as sa
-
+from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "001"
@@ -30,7 +29,9 @@ def upgrade() -> None:
     )
 
     # Create index on provider for faster lookups
-    op.create_index(op.f("ix_embeddings_provider"), "embeddings", ["provider"], unique=False)
+    op.create_index(
+        op.f("ix_embeddings_provider"), "embeddings", ["provider"], unique=False
+    )
 
 
 def downgrade() -> None:

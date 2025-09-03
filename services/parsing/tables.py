@@ -1,6 +1,6 @@
 import io
-import uuid
 import logging
+import uuid
 
 import camelot
 import pandas as pd
@@ -49,7 +49,9 @@ class TableParser:
                 for page_num, page in enumerate(pdf.pages, 1):
                     page_tables = page.extract_tables()
                     for table_num, table_data in enumerate(page_tables, 1):
-                        if table_data and len(table_data) > 1:  # At least header + 1 row
+                        if (
+                            table_data and len(table_data) > 1
+                        ):  # At least header + 1 row
                             table_id = f"pdfplumber_{page_num}_{table_num}"
                             table_text = self._format_table_as_markdown(table_data)
 
@@ -180,7 +182,7 @@ class TableParser:
         tables = []
 
         try:
-            with open(file_path, "r", encoding="utf-8") as f:
+            with open(file_path, encoding="utf-8") as f:
                 content = f.read()
 
             # Look for markdown table patterns

@@ -1,5 +1,6 @@
+import threading
+import time
 from test import TestCase, fill_redis_with_vectors, generate_random_vector
-import threading, time
 
 
 class ConcurrentVSIMAndDEL(TestCase):
@@ -23,7 +24,13 @@ class ConcurrentVSIMAndDEL(TestCase):
             while True:
                 query_vec = generate_random_vector(dim)
                 result = self.redis.execute_command(
-                    "VSIM", self.test_key, "VALUES", dim, *[str(x) for x in query_vec], "COUNT", 10
+                    "VSIM",
+                    self.test_key,
+                    "VALUES",
+                    dim,
+                    *[str(x) for x in query_vec],
+                    "COUNT",
+                    10,
                 )
                 if not result:
                     # Empty array detected, key is deleted
@@ -46,5 +53,9 @@ class ConcurrentVSIMAndDEL(TestCase):
             t.join()
 
         # Verify that all threads detected an empty array or error
-        assert len(thread_results) == len(threads), "Not all threads detected the key deletion"
-        assert all(thread_results), "Some threads did not detect an empty array or error after DEL"
+        assert len(thread_results) == len(
+            threads
+        ), "Not all threads detected the key deletion"
+        assert all(
+            thread_results
+        ), "Some threads did not detect an empty array or error after DEL"

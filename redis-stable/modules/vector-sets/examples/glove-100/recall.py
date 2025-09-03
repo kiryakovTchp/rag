@@ -7,14 +7,17 @@
 # GNU Affero General Public License v3 (AGPLv3).
 #
 
-import h5py
-import redis
-import numpy as np
-from tqdm import tqdm
 import argparse
 
+import h5py
+import numpy as np
+import redis
+from tqdm import tqdm
+
 # Initialize Redis connection
-redis_client = redis.Redis(host="localhost", port=6379, decode_responses=True, encoding="utf-8")
+redis_client = redis.Redis(
+    host="localhost", port=6379, decode_responses=True, encoding="utf-8"
+)
 
 
 def get_redis_neighbors(query_vector, k):
@@ -40,10 +43,16 @@ def calculate_recall(ground_truth, predicted, k):
 def main():
     parser = argparse.ArgumentParser(description="Evaluate Redis VSIM recall")
     parser.add_argument(
-        "--k", type=int, default=10, help="Number of neighbors to evaluate (default: 10)"
+        "--k",
+        type=int,
+        default=10,
+        help="Number of neighbors to evaluate (default: 10)",
     )
     parser.add_argument(
-        "--batch", type=int, default=100, help="Progress update frequency (default: 100)"
+        "--batch",
+        type=int,
+        default=100,
+        help="Progress update frequency (default: 100)",
     )
     args = parser.parse_args()
 

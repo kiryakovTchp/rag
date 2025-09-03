@@ -1,11 +1,12 @@
 """Test progress monotonicity."""
 
 import unittest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
+
+from db.models import Chunk, Document, Job
+from db.session import SessionLocal
 from workers.tasks.embed import embed_document
 from workers.tasks.index import index_document
-from db.models import Document, Job, Chunk
-from db.session import SessionLocal
 
 
 class TestProgressMonotonic(unittest.TestCase):
@@ -26,7 +27,7 @@ class TestProgressMonotonic(unittest.TestCase):
             name="test_doc.pdf",
             mime="application/pdf",
             storage_uri="s3://test/test.pdf",
-            status="uploaded"
+            status="uploaded",
         )
         self.db.add(document)
         self.db.flush()
@@ -38,7 +39,7 @@ class TestProgressMonotonic(unittest.TestCase):
                 document_id=document.id,
                 text=f"Test chunk {i}",
                 token_count=100,
-                level=1
+                level=1,
             )
             chunks.append(chunk)
             self.db.add(chunk)
@@ -46,9 +47,11 @@ class TestProgressMonotonic(unittest.TestCase):
         self.db.commit()
 
         # Mock embedder and index
-        with patch('workers.tasks.embed.EmbeddingProvider') as mock_embedder_class, \
-             patch('workers.tasks.embed.PGVectorIndex') as mock_index_class:
-            
+        with patch(
+            "workers.tasks.embed.EmbeddingProvider"
+        ) as mock_embedder_class, patch(
+            "workers.tasks.embed.PGVectorIndex"
+        ) as mock_index_class:
             mock_embedder = MagicMock()
             mock_embedder.embed_texts.return_value = [[0.1] * 1024] * 10
             mock_embedder.get_provider.return_value = "test"
@@ -64,17 +67,18 @@ class TestProgressMonotonic(unittest.TestCase):
                 progress_updates.append(progress)
 
             # Mock session to track progress
-            with patch('workers.tasks.embed.SessionLocal') as mock_session:
+            with patch("workers.tasks.embed.SessionLocal") as mock_session:
                 mock_session.return_value = self.db
-                
+
                 # Run embed task
                 result = embed_document(document.id)
 
                 # Check progress was updated
-                job = self.db.query(Job).filter(
-                    Job.document_id == document.id,
-                    Job.type == "embed"
-                ).first()
+                job = (
+                    self.db.query(Job)
+                    .filter(Job.document_id == document.id, Job.type == "embed")
+                    .first()
+                )
 
                 self.assertIsNotNone(job)
                 self.assertEqual(job.progress, 100)
@@ -87,7 +91,7 @@ class TestProgressMonotonic(unittest.TestCase):
             name="test_doc.pdf",
             mime="application/pdf",
             storage_uri="s3://test/test.pdf",
-            status="uploaded"
+            status="uploaded",
         )
         self.db.add(document)
         self.db.flush()
@@ -99,7 +103,7 @@ class TestProgressMonotonic(unittest.TestCase):
                 document_id=document.id,
                 text=f"Test chunk {i}",
                 token_count=100,
-                level=1
+                level=1,
             )
             chunks.append(chunk)
             self.db.add(chunk)
@@ -107,9 +111,11 @@ class TestProgressMonotonic(unittest.TestCase):
         self.db.commit()
 
         # Mock embedder and index
-        with patch('workers.tasks.index.EmbeddingProvider') as mock_embedder_class, \
-             patch('workers.tasks.index.PGVectorIndex') as mock_index_class:
-            
+        with patch(
+            "workers.tasks.index.EmbeddingProvider"
+        ) as mock_embedder_class, patch(
+            "workers.tasks.index.PGVectorIndex"
+        ) as mock_index_class:
             mock_embedder = MagicMock()
             mock_embedder.embed_texts.return_value = [[0.1] * 1024] * 10
             mock_embedder.get_provider.return_value = "test"
@@ -120,7 +126,7 @@ class TestProgressMonotonic(unittest.TestCase):
             mock_index_class.return_value = mock_index
 
             # Mock current_task
-            with patch('workers.tasks.index.current_task') as mock_task:
+            with patch("workers.tasks.index.current_task") as mock_task:
                 mock_task.update_state = MagicMock()
 
                 # Run index task
@@ -140,7 +146,7 @@ class TestProgressMonotonic(unittest.TestCase):
             name="test_doc.pdf",
             mime="application/pdf",
             storage_uri="s3://test/test.pdf",
-            status="uploaded"
+            status="uploaded",
         )
         self.db.add(document)
         self.db.flush()
@@ -152,7 +158,7 @@ class TestProgressMonotonic(unittest.TestCase):
                 document_id=document.id,
                 text=f"Test chunk {i}",
                 token_count=100,
-                level=1
+                level=1,
             )
             chunks.append(chunk)
             self.db.add(chunk)
@@ -160,9 +166,11 @@ class TestProgressMonotonic(unittest.TestCase):
         self.db.commit()
 
         # Mock embedder and index
-        with patch('workers.tasks.embed.EmbeddingProvider') as mock_embedder_class, \
-             patch('workers.tasks.embed.PGVectorIndex') as mock_index_class:
-            
+        with patch(
+            "workers.tasks.embed.EmbeddingProvider"
+        ) as mock_embedder_class, patch(
+            "workers.tasks.embed.PGVectorIndex"
+        ) as mock_index_class:
             mock_embedder = MagicMock()
             mock_embedder.embed_texts.return_value = [[0.1] * 1024] * 5
             mock_embedder.get_provider.return_value = "test"
@@ -172,17 +180,18 @@ class TestProgressMonotonic(unittest.TestCase):
             mock_index_class.return_value = mock_index
 
             # Mock session
-            with patch('workers.tasks.embed.SessionLocal') as mock_session:
+            with patch("workers.tasks.embed.SessionLocal") as mock_session:
                 mock_session.return_value = self.db
-                
+
                 # Run embed task
                 result = embed_document(document.id)
 
                 # Check final progress
-                job = self.db.query(Job).filter(
-                    Job.document_id == document.id,
-                    Job.type == "embed"
-                ).first()
+                job = (
+                    self.db.query(Job)
+                    .filter(Job.document_id == document.id, Job.type == "embed")
+                    .first()
+                )
 
                 self.assertIsNotNone(job)
                 self.assertEqual(job.progress, 100)

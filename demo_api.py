@@ -3,125 +3,116 @@
 Демонстрация API PromoAI RAG
 """
 
-import json
-import time
-from typing import Any, Dict, Optional
+import logging
 
-import requests  # type: ignore
+from fastapi import FastAPI, HTTPException
+from fastapi.responses import JSONResponse
+
+from services.retrieve.hybrid import HybridRetriever
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+app = FastAPI(title="Demo API", version="1.0.0")
+
+# Initialize retriever
+retriever = HybridRetriever()
 
 
-def test_health() -> bool:
-    """Тест health endpoint"""
-    print("🔍 Тестируем health endpoint...")
+@app.get("/")
+async def root():
+    """Root endpoint."""
+    return {"message": "Demo API is running!"}
+
+
+@app.get("/health")
+async def health():
+    """Health check endpoint."""
+    return {"status": "healthy"}
+
+
+@app.post("/search")
+async def search(query: str, top_k: int = 10):
+    """Search endpoint using hybrid retriever."""
     try:
-        response = requests.get("http://localhost:8000/healthz")
-        if response.status_code == 200:
-            print("✅ Health check passed")
-            return True
-        else:
-            print(f"❌ Health check failed: {response.status_code}")
-            return False
+        logger.info(f"Searching for: {query} with top_k={top_k}")
+
+        # Perform search
+        results = retriever.retrieve(query, top_k=top_k, use_rerank=False)
+
+        # Format results
+        formatted_results = []
+        for result in results:
+            formatted_results.append(
+                {
+                    "chunk_id": result["chunk_id"],
+                    "doc_id": result["doc_id"],
+                    "page": result["page"],
+                    "score": result["score"],
+                    "snippet": result["snippet"],
+                    "breadcrumbs": result["breadcrumbs"],
+                }
+            )
+
+        return {
+            "query": query,
+            "results": formatted_results,
+            "total": len(formatted_results),
+        }
+
     except Exception as e:
-        print(f"❌ Health check error: {e}")
-        return False
+        logger.error(f"Search failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-def test_ingest() -> Optional[int]:
-    """Тест ingest endpoint"""
-    print("📤 Тестируем ingest endpoint...")
+@app.post("/search/rerank")
+async def search_with_rerank(query: str, top_k: int = 10, rerank_k: int = 5):
+    """Search endpoint with reranking enabled."""
     try:
-        # Создаем тестовый файл
-        test_content = """# Test Document
+        logger.info(f"Searching with rerank for: {query}")
 
-This is a test document for the RAG system.
+        # Perform search with reranking
+        results = retriever.retrieve(
+            query, top_k=top_k, rerank_k=rerank_k, use_rerank=True
+        )
 
-## Section 1
-Some content here.
+        # Format results
+        formatted_results = []
+        for result in results:
+            formatted_results.append(
+                {
+                    "chunk_id": result["chunk_id"],
+                    "doc_id": result["doc_id"],
+                    "page": result["page"],
+                    "score": result["score"],
+                    "snippet": result["snippet"],
+                    "breadcrumbs": result["breadcrumbs"],
+                }
+            )
 
-## Section 2
-More content with **bold** and *italic* text.
+        return {
+            "query": query,
+            "results": formatted_results,
+            "total": len(formatted_results),
+            "reranked": True,
+        }
 
-| Name | Age | City |
-|------|-----|------|
-| John | 25  | NYC  |
-| Jane | 30  | LA   |
-"""
-
-        files = {"file": ("test_document.txt", test_content, "text/plain")}
-        data = {"tenant_id": "test", "safe_mode": "false"}
-
-        response = requests.post("http://localhost:8000/ingest", files=files, data=data)
-
-        if response.status_code == 200:
-            result = response.json()
-            print(f"✅ Ingest successful: {result}")
-            return result["job_id"]
-        else:
-            print(f"❌ Ingest failed: {response.status_code} - {response.text}")
-            return None
     except Exception as e:
-        print(f"❌ Ingest error: {e}")
-        return None
+        logger.error(f"Search with rerank failed: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
 
 
-def test_job_status(job_id: int) -> Optional[Dict[str, Any]]:
-    """Тест job status endpoint"""
-    print(f"📊 Тестируем job status для job_id={job_id}...")
-    try:
-        max_attempts = 30
-        for _ in range(max_attempts):
-            response = requests.get(f"http://localhost:8000/ingest/{job_id}")
-
-            if response.status_code == 200:
-                result = response.json()
-                status = result["status"]
-                progress = result["progress"]
-
-                print(f"📈 Status: {status}, Progress: {progress}%")
-
-                if status == "done":
-                    print("✅ Job completed successfully!")
-                    return result
-                elif status == "error":
-                    print(f"❌ Job failed: {result.get('error', 'Unknown error')}")
-                    return result
-                else:
-                    time.sleep(2)
-            else:
-                print(f"❌ Job status failed: {response.status_code}")
-                return None
-
-        print("⏰ Job timeout")
-        return None
-    except Exception as e:
-        print(f"❌ Job status error: {e}")
-        return None
-
-
-def main() -> None:
-    """Основная функция демонстрации"""
-    print("🚀 Демонстрация PromoAI RAG API")
-    print("=" * 50)
-
-    # Тест 1: Health check
-    if not test_health():
-        print("❌ Health check failed, exiting")
-        return
-
-    # Тест 2: Ingest
-    job_id = test_ingest()
-    if not job_id:
-        print("❌ Ingest failed, exiting")
-        return
-
-    # Тест 3: Job status polling
-    result = test_job_status(job_id)
-    if result:
-        print("🎉 Демонстрация завершена успешно!")
-        print(f"📋 Результат: {json.dumps(result, indent=2)}")
-    else:
-        print("❌ Демонстрация завершена с ошибками")
+@app.exception_handler(Exception)
+async def global_exception_handler(request, exc):
+    """Global exception handler."""
+    logger.error(f"Unhandled exception: {exc}")
+    return JSONResponse(
+        status_code=500, content={"error": "Internal server error", "detail": str(exc)}
+    )
 
 
 if __name__ == "__main__":
-    main()
+    import uvicorn
+
+    uvicorn.run(app, host="0.0.0.0", port=8000)

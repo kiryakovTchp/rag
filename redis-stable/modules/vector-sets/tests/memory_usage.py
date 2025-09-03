@@ -1,5 +1,5 @@
-from test import TestCase, generate_random_vector
 import struct
+from test import TestCase, generate_random_vector
 
 
 class MemoryUsageTest(TestCase):
@@ -35,17 +35,24 @@ class MemoryUsageTest(TestCase):
 
             # Add more attributes to increase complexity
             self.redis.execute_command(
-                "VSETATTR", self.test_key, f"{self.test_key}:item:1", '{"color":"blue","size":10}'
+                "VSETATTR",
+                self.test_key,
+                f"{self.test_key}:item:1",
+                '{"color":"blue","size":10}',
             )
 
             # Check memory usage again
-            new_memory_usage = self.redis.execute_command("MEMORY", "USAGE", self.test_key)
+            new_memory_usage = self.redis.execute_command(
+                "MEMORY", "USAGE", self.test_key
+            )
             assert (
                 new_memory_usage > 0
             ), "MEMORY USAGE should still return a positive value after setting attributes"
 
             # Memory usage should be higher after adding attributes
-            assert new_memory_usage > memory_usage, "Memory usage increase after adding attributes"
+            assert (
+                new_memory_usage > memory_usage
+            ), "Memory usage increase after adding attributes"
 
         except Exception as e:
             raise AssertionError(f"MEMORY USAGE command failed: {str(e)}")

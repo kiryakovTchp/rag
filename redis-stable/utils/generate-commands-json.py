@@ -2,8 +2,8 @@
 import argparse
 import json
 import os
-import sys
 import subprocess
+import sys
 from collections import OrderedDict
 
 
@@ -65,7 +65,12 @@ def convert_entry_to_objects_array(cmd, docs):
     key = name.replace("|", " ")
 
     subcommand_docs = docs.pop("subcommands", [])
-    rep.extend([convert_entry_to_objects_array(x, subcommand_docs[x[0]])[0] for x in subcommands])
+    rep.extend(
+        [
+            convert_entry_to_objects_array(x, subcommand_docs[x[0]])[0]
+            for x in subcommands
+        ]
+    )
 
     # The command's value is ordered so the interesting stuff that we care about
     # is at the start. Optional `None` and empty list values are filtered out.
@@ -80,7 +85,9 @@ def convert_entry_to_objects_array(cmd, docs):
         value["since"] = docs.pop("since")
     value["group"] = group
     set_if_not_none_or_empty(value, "complexity", docs.pop("complexity", None))
-    set_if_not_none_or_empty(value, "deprecated_since", docs.pop("deprecated_since", None))
+    set_if_not_none_or_empty(
+        value, "deprecated_since", docs.pop("deprecated_since", None)
+    )
     set_if_not_none_or_empty(value, "replaced_by", docs.pop("replaced_by", None))
     set_if_not_none_or_empty(value, "history", docs.pop("history", []))
     set_if_not_none_or_empty(value, "acl_categories", acl_categories)

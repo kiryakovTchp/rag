@@ -2,8 +2,8 @@
 
 import sys
 from itertools import combinations
-from os import uname
 from multiprocessing import cpu_count
+from os import uname
 from subprocess import call
 
 # Later, we want to test extended vaddr support.  Apparently, the "real" way of
@@ -100,7 +100,8 @@ for cc, cxx in possible_compilers:
                     "--enable-prof" in config_opts or "dss:primary" in malloc_conf_opts
                 )
                 if (uname == "Linux" and linux_supported) or (
-                    not linux_supported and (uname != "Darwin" or not darwin_unsupported)
+                    not linux_supported
+                    and (uname != "Darwin" or not darwin_unsupported)
                 ):
                     print(
                         """cat <<EOF > run_test_%(ind)d.sh

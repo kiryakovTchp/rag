@@ -1,5 +1,5 @@
-from test import TestCase, fill_redis_with_vectors, generate_random_vector
 import random
+from test import TestCase, fill_redis_with_vectors, generate_random_vector
 
 
 class HNSWPersistence(TestCase):
@@ -39,7 +39,9 @@ class HNSWPersistence(TestCase):
         random.seed(42)
 
         # Create two datasets - one normal and one with dimension reduction
-        normal_data = fill_redis_with_vectors(self.redis, f"{self.test_key}:normal", count, dim)
+        normal_data = fill_redis_with_vectors(
+            self.redis, f"{self.test_key}:normal", count, dim
+        )
         projected_data = fill_redis_with_vectors(
             self.redis, f"{self.test_key}:projected", count, dim, reduced_dim
         )
@@ -49,7 +51,9 @@ class HNSWPersistence(TestCase):
         query_vec_projected = generate_random_vector(dim)
 
         # Get initial results for both sets
-        initial_normal = self._verify_results(f"{self.test_key}:normal", dim, query_vec_normal)
+        initial_normal = self._verify_results(
+            f"{self.test_key}:normal", dim, query_vec_normal
+        )
         initial_projected = self._verify_results(
             f"{self.test_key}:projected", dim, query_vec_projected, reduced_dim
         )
@@ -58,7 +62,9 @@ class HNSWPersistence(TestCase):
         self.redis.execute_command("DEBUG", "RELOAD")
 
         # Verify results after reload
-        reloaded_normal = self._verify_results(f"{self.test_key}:normal", dim, query_vec_normal)
+        reloaded_normal = self._verify_results(
+            f"{self.test_key}:normal", dim, query_vec_normal
+        )
         reloaded_projected = self._verify_results(
             f"{self.test_key}:projected", dim, query_vec_projected, reduced_dim
         )
@@ -69,7 +75,9 @@ class HNSWPersistence(TestCase):
         ), "Normal vectors: Result count mismatch before/after reload"
 
         for key in initial_normal:
-            assert key in reloaded_normal, f"Normal vectors: Missing item after reload: {key}"
+            assert (
+                key in reloaded_normal
+            ), f"Normal vectors: Missing item after reload: {key}"
             assert abs(initial_normal[key] - reloaded_normal[key]) < 0.0001, (
                 f"Normal vectors: Score mismatch for {key}: "
                 + f"before={initial_normal[key]:.6f}, after={reloaded_normal[key]:.6f}"
@@ -81,7 +89,9 @@ class HNSWPersistence(TestCase):
         ), "Projected vectors: Result count mismatch before/after reload"
 
         for key in initial_projected:
-            assert key in reloaded_projected, f"Projected vectors: Missing item after reload: {key}"
+            assert (
+                key in reloaded_projected
+            ), f"Projected vectors: Missing item after reload: {key}"
             assert abs(initial_projected[key] - reloaded_projected[key]) < 0.0001, (
                 f"Projected vectors: Score mismatch for {key}: "
                 + f"before={initial_projected[key]:.6f}, after={reloaded_projected[key]:.6f}"

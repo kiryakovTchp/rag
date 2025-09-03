@@ -1,7 +1,7 @@
-from test import TestCase, generate_random_vector
-import struct
 import math
 import random
+import struct
+from test import TestCase, generate_random_vector
 
 
 class VectorUpdateAndClusters(TestCase):
@@ -31,7 +31,11 @@ class VectorUpdateAndClusters(TestCase):
             vec = self.generate_cluster_vector(cluster1_base)
             vec_bytes = struct.pack(f"{dim}f", *vec)
             self.redis.execute_command(
-                "VADD", self.test_key, "FP32", vec_bytes, f"{self.test_key}:cluster1:{i}"
+                "VADD",
+                self.test_key,
+                "FP32",
+                vec_bytes,
+                f"{self.test_key}:cluster1:{i}",
             )
 
         # Add vectors from second cluster
@@ -39,7 +43,11 @@ class VectorUpdateAndClusters(TestCase):
             vec = self.generate_cluster_vector(cluster2_base)
             vec_bytes = struct.pack(f"{dim}f", *vec)
             self.redis.execute_command(
-                "VADD", self.test_key, "FP32", vec_bytes, f"{self.test_key}:cluster2:{i}"
+                "VADD",
+                self.test_key,
+                "FP32",
+                vec_bytes,
+                f"{self.test_key}:cluster2:{i}",
             )
 
         # Pick a test vector from cluster1
@@ -59,7 +67,9 @@ class VectorUpdateAndClusters(TestCase):
         )
 
         # Count how many cluster1 items are in top results
-        cluster1_count = sum(1 for i in range(0, len(results), 2) if b"cluster1" in results[i])
+        cluster1_count = sum(
+            1 for i in range(0, len(results), 2) if b"cluster1" in results[i]
+        )
         assert cluster1_count > 80, "Initial clustering check failed"
 
         # Now update the test vector to be in cluster2
@@ -74,7 +84,8 @@ class VectorUpdateAndClusters(TestCase):
         # Verify updated vector matches what we inserted
         dot_product = sum(a * b for a, b in zip(updated_vec, new_vec))
         similarity = dot_product / (
-            math.sqrt(sum(x * x for x in updated_vec)) * math.sqrt(sum(x * x for x in new_vec))
+            math.sqrt(sum(x * x for x in updated_vec))
+            * math.sqrt(sum(x * x for x in new_vec))
         )
         assert similarity > 0.9, "Vector was not properly updated"
 
@@ -96,7 +107,9 @@ class VectorUpdateAndClusters(TestCase):
             if results[i].decode() == test_key:
                 found = True
                 similarity = float(results[i + 1])
-                assert similarity > 0.80, f"Updated vector has low similarity: {similarity}"
+                assert (
+                    similarity > 0.80
+                ), f"Updated vector has low similarity: {similarity}"
                 break
 
         assert found, "Updated vector not found in cluster2 proximity"

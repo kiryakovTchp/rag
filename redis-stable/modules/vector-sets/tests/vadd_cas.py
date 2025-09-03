@@ -1,10 +1,9 @@
-from test import TestCase, generate_random_vector
-import threading
-import struct
 import math
-import time
 import random
-from typing import List, Dict
+import struct
+import threading
+from test import TestCase, generate_random_vector
+from typing import Dict, List
 
 
 class ConcurrentCASTest(TestCase):
@@ -63,7 +62,9 @@ class ConcurrentCASTest(TestCase):
         # Launch threads
         for i in range(num_threads):
             start_idx = i * vectors_per_thread
-            end_idx = start_idx + vectors_per_thread if i < num_threads - 1 else total_vectors
+            end_idx = (
+                start_idx + vectors_per_thread if i < num_threads - 1 else total_vectors
+            )
             thread = threading.Thread(
                 target=self.worker, args=(vectors, start_idx, end_idx, dim, results)
             )
@@ -76,7 +77,9 @@ class ConcurrentCASTest(TestCase):
 
         # Verify cardinality
         card = self.redis.execute_command("VCARD", self.test_key)
-        assert card == total_vectors, f"Expected {total_vectors} elements, but found {card}"
+        assert (
+            card == total_vectors
+        ), f"Expected {total_vectors} elements, but found {card}"
 
         # Verify each vector
         num_verified = 0

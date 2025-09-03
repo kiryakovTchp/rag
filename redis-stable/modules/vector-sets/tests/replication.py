@@ -1,7 +1,7 @@
-from test import TestCase, generate_random_vector
-import struct
 import random
+import struct
 import time
+from test import TestCase, generate_random_vector
 
 
 class ComprehensiveReplicationTest(TestCase):
@@ -90,13 +90,19 @@ class ComprehensiveReplicationTest(TestCase):
         ), f"VDIM mismatch: primary={primary_dim}, replica={replica_dim}"
 
         # Verify digests match using DEBUG DIGEST
-        primary_digest = self.redis.execute_command("DEBUG", "DIGEST-VALUE", self.test_key)
-        replica_digest = self.replica.execute_command("DEBUG", "DIGEST-VALUE", self.test_key)
+        primary_digest = self.redis.execute_command(
+            "DEBUG", "DIGEST-VALUE", self.test_key
+        )
+        replica_digest = self.replica.execute_command(
+            "DEBUG", "DIGEST-VALUE", self.test_key
+        )
         assert (
             primary_digest == replica_digest
         ), f"Digest mismatch: primary={primary_digest}, replica={replica_digest}"
 
         # Print summary
-        print(f"\n  Added and maintained {len(added_items)} vectors with dimension {vector_dim}")
+        print(
+            f"\n  Added and maintained {len(added_items)} vectors with dimension {vector_dim}"
+        )
         print(f"  Final vector count: {primary_card}")
         print(f"  Final digest: {primary_digest[0].decode()}")

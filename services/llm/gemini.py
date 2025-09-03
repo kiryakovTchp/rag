@@ -1,175 +1,226 @@
-"""Google AI Studio (Gemini) LLM provider."""
+"""Gemini LLM provider using Google's Generative AI."""
 
-import asyncio
+import logging
 import os
 import time
-from typing import Iterator, List
+from collections.abc import Iterator
 from concurrent.futures import ThreadPoolExecutor
 
 from google import genai
-from google.genai import types
+from google.generativeai import types
 
 from services.llm.base import LLMProvider
 
+logger = logging.getLogger(__name__)
+
 
 class GeminiProvider(LLMProvider):
-    """Google AI Studio provider using Gemini models."""
-    
+    """Gemini LLM provider implementation."""
+
     def __init__(self):
         """Initialize Gemini provider."""
-        api_key = os.getenv("GEMINI_API_KEY")
+        api_key = os.getenv("GOOGLE_API_KEY")
         if not api_key:
-            raise ValueError("GEMINI_API_KEY environment variable is required")
-        
-        self.client = genai.Client(api_key=api_key)
+            raise ValueError("GOOGLE_API_KEY environment variable required")
+
+        genai.configure(api_key=api_key)
         self.executor = ThreadPoolExecutor(max_workers=4)
-    
-    def _prepare_messages(self, messages: List[dict]) -> List[types.Content]:
+
+    def _prepare_messages(self, messages: list[dict]) -> list[types.Content]:
         """Convert messages to Gemini format.
-        
-        Gemini doesn't have a separate system role, so we prepend system messages
-        to the first user message.
+
+        Args:
+            messages: List of message dictionaries
+
+        Returns:
+            List of Gemini Content objects
         """
-        contents = []
-        system_parts = []
-        
-        for msg in messages:
-            role = msg["role"]
-            content = msg["content"]
-            
+        gemini_messages = []
+
+        for message in messages:
+            role = message.get("role", "user")
+            content = message.get("content", "")
+
             if role == "system":
-                system_parts.append(content)
-            elif role == "user":
-                # Combine system messages with user message
-                if system_parts:
-                    full_content = "\n\n".join(system_parts + [content])
-                    system_parts = []  # Clear after using
+                # Gemini doesn't support system messages, prepend to first user message
+                if gemini_messages and gemini_messages[-1].role == "user":
+                    gemini_messages[-1].parts[
+                        0
+                    ].text = f"{content}\n\n{gemini_messages[-1].parts[0].text}"
                 else:
-                    full_content = content
-                
-                contents.append(types.Content(
-                    role="user",
-                    parts=[types.Part.from_text(full_content)]
-                ))
+                    # Create a user message with system content
+                    gemini_messages.append(
+                        types.Content(
+                            role="user", parts=[types.Part.from_text(content)]
+                        )
+                    )
+            elif role == "user":
+                gemini_messages.append(
+                    types.Content(role="user", parts=[types.Part.from_text(content)])
+                )
             elif role == "assistant":
-                contents.append(types.Content(
-                    role="model",
-                    parts=[types.Part.from_text(content)]
-                ))
-        
-        return contents
-    
+                gemini_messages.append(
+                    types.Content(role="model", parts=[types.Part.from_text(content)])
+                )
+
+        return gemini_messages
+
     def generate(
-        self, 
-        messages: List[dict], 
-        model: str, 
-        max_tokens: int, 
-        temperature: float, 
-        timeout_s: int
+        self,
+        messages: list[dict],
+        model: str,
+        max_tokens: int,
+        temperature: float = 0.7,
+        timeout_s: int = 60,
     ) -> tuple[str, dict]:
-        """Generate a single response."""
-        start_time = time.time()
-        
+        """Generate text using Gemini.
+
+        Args:
+            messages: List of message dictionaries
+            model: Model name (e.g., "gemini-pro")
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature
+            timeout_s: Timeout in seconds
+
+        Returns:
+            Tuple of (generated_text, usage_info)
+        """
         try:
-            contents = self._prepare_messages(messages)
-            
-            # Run in thread pool with timeout
-            future = self.executor.submit(
-                self._generate_sync,
-                contents, model, max_tokens, temperature
+            # Prepare messages
+            gemini_messages = self._prepare_messages(messages)
+
+            # Configure generation
+            config = types.GenerationConfig(
+                max_output_tokens=max_tokens, temperature=temperature
             )
-            
-            response = future.result(timeout=timeout_s)
-            
-            latency_ms = int((time.time() - start_time) * 1000)
-            
-            # Parse usage if available
+
+            # Generate response
+            start_time = time.time()
+            response = self._generate_sync(
+                gemini_messages, model, max_tokens, temperature
+            )
+            duration = time.time() - start_time
+
+            # Extract usage info
             usage = {
-                "in_tokens": None,
-                "out_tokens": None,
-                "latency_ms": latency_ms,
                 "provider": "gemini",
                 "model": model,
-                "cost_usd": None
+                "in_tokens": self._count_tokens(messages),
+                "out_tokens": len(response.split()),
+                "latency_ms": int(duration * 1000),
+                "cost_usd": self._estimate_cost(model, max_tokens),
             }
-            
-            if hasattr(response, 'usage_metadata'):
-                usage["in_tokens"] = response.usage_metadata.prompt_token_count
-                usage["out_tokens"] = response.usage_metadata.candidates_token_count
-            
-            return response.text, usage
-            
+
+            return response, usage
+
         except Exception as e:
             # Handle specific errors
             if "API key" in str(e) or "403" in str(e):
-                raise Exception("LLM_UNAVAILABLE: Invalid API key")
+                raise Exception("LLM_UNAVAILABLE: Invalid API key") from e
             elif "429" in str(e):
-                raise Exception("LLM_UNAVAILABLE: Rate limit exceeded")
+                raise Exception("LLM_UNAVAILABLE: Rate limit exceeded") from e
             elif "timeout" in str(e).lower():
-                raise Exception("LLM_UNAVAILABLE: Request timeout")
+                raise Exception("LLM_UNAVAILABLE: Request timeout") from e
             else:
-                raise Exception(f"LLM_UNAVAILABLE: {str(e)}")
-    
+                raise Exception(f"LLM_UNAVAILABLE: {str(e)}") from e
+
     def _generate_sync(self, contents, model, max_tokens, temperature):
-        """Synchronous generation call."""
-        config = types.GenerateContentConfig(
-            max_output_tokens=max_tokens,
-            temperature=temperature
+        """Synchronous generation using executor."""
+        model_instance = genai.GenerativeModel(model)
+
+        config = types.GenerationConfig(
+            max_output_tokens=max_tokens, temperature=temperature
         )
-        
-        return self.client.models.generate_content(
-            model=model,
-            contents=contents,
-            config=config
-        )
-    
+
+        response = model_instance.generate_content(contents, generation_config=config)
+
+        return response.text
+
     def stream(
-        self, 
-        messages: List[dict], 
-        model: str, 
-        max_tokens: int, 
-        temperature: float, 
-        timeout_s: int
-    ) -> Iterator[str]:
-        """Generate streaming response."""
+        self,
+        messages: list[dict],
+        model: str,
+        max_tokens: int,
+        temperature: float = 0.7,
+        timeout_s: int = 60,
+    ) -> Iterator[dict]:
+        """Stream text generation using Gemini.
+
+        Args:
+            messages: List of message dictionaries
+            model: Model name (e.g., "gemini-pro")
+            max_tokens: Maximum tokens to generate
+            temperature: Sampling temperature
+            timeout_s: Timeout in seconds
+
+        Yields:
+            Response chunks as dictionaries
+        """
         try:
-            contents = self._prepare_messages(messages)
-            
-            config = types.GenerateContentConfig(
-                max_output_tokens=max_tokens,
-                temperature=temperature
+            # Prepare messages
+            gemini_messages = self._prepare_messages(messages)
+
+            # Configure generation
+            config = types.GenerationConfig(
+                max_output_tokens=max_tokens, temperature=temperature
             )
-            
-            # Run in thread pool with timeout
-            future = self.executor.submit(
-                self._stream_sync,
-                contents, model, config
-            )
-            
-            # Yield chunks with timeout
+
+            # Stream response
             start_time = time.time()
-            for chunk in future.result(timeout=timeout_s):
-                if time.time() - start_time > timeout_s:
-                    raise Exception("LLM_UNAVAILABLE: Stream timeout")
-                
+            for chunk in self._stream_sync(gemini_messages, model, config):
                 if chunk.text:
-                    yield chunk.text
-                    
+                    yield {"type": "chunk", "text": chunk.text}
+
+            # Send final chunk with usage info
+            duration = time.time() - start_time
+            usage = {
+                "provider": "gemini",
+                "model": model,
+                "in_tokens": self._count_tokens(messages),
+                "out_tokens": 0,  # Will be calculated from chunks
+                "latency_ms": int(duration * 1000),
+                "cost_usd": self._estimate_cost(model, max_tokens),
+            }
+
+            yield {"type": "done", "usage": usage}
+
         except Exception as e:
             # Handle specific errors
             if "API key" in str(e) or "403" in str(e):
-                raise Exception("LLM_UNAVAILABLE: Invalid API key")
+                raise Exception("LLM_UNAVAILABLE: Invalid API key") from e
             elif "429" in str(e):
-                raise Exception("LLM_UNAVAILABLE: Rate limit exceeded")
+                raise Exception("LLM_UNAVAILABLE: Rate limit exceeded") from e
             elif "timeout" in str(e).lower():
-                raise Exception("LLM_UNAVAILABLE: Request timeout")
+                raise Exception("LLM_UNAVAILABLE: Request timeout") from e
             else:
-                raise Exception(f"LLM_UNAVAILABLE: {str(e)}")
-    
+                raise Exception(f"LLM_UNAVAILABLE: {str(e)}") from e
+
     def _stream_sync(self, contents, model, config):
-        """Synchronous streaming call."""
-        return self.client.models.generate_content_stream(
-            model=model,
-            contents=contents,
-            config=config
+        """Synchronous streaming using executor."""
+        model_instance = genai.GenerativeModel(model)
+
+        response = model_instance.generate_content(
+            contents, generation_config=config, stream=True
         )
+
+        for chunk in response:
+            yield chunk
+
+    def _count_tokens(self, messages: list[dict]) -> int:
+        """Estimate token count for messages."""
+        total = 0
+        for message in messages:
+            content = message.get("content", "")
+            total += len(content.split()) * 1.3  # Rough estimate
+        return int(total)
+
+    def _estimate_cost(self, model: str, max_tokens: int) -> float:
+        """Estimate cost for generation."""
+        # Rough cost estimates (USD per 1K tokens)
+        costs = {
+            "gemini-pro": 0.0005,  # $0.0005 per 1K input tokens
+            "gemini-pro-vision": 0.0005,
+        }
+
+        base_cost = costs.get(model, 0.001)
+        return (max_tokens / 1000) * base_cost

@@ -1,8 +1,7 @@
 #!/usr/bin/env python3
 
-from itertools import combinations, chain
-from enum import Enum, auto
-
+from enum import auto
+from itertools import chain, combinations
 
 LINUX = "linux"
 OSX = "osx"
@@ -60,7 +59,7 @@ script:
 """
 
 
-class Option(object):
+class Option:
     class Type:
         COMPILER = auto()
         COMPILER_FLAG = auto()
@@ -93,7 +92,11 @@ class Option(object):
         return Option(Option.Type.FEATURE, value)
 
     def __eq__(self, obj):
-        return isinstance(obj, Option) and obj.type == self.type and obj.value == self.value
+        return (
+            isinstance(obj, Option)
+            and obj.type == self.type
+            and obj.value == self.value
+        )
 
 
 # The 'default' configuration is gcc, on linux, with no compiler or configure
@@ -143,7 +146,12 @@ malloc_conf_unusuals = [
 ]
 
 
-all_unusuals = compilers_unusual + feature_unusuals + configure_flag_unusuals + malloc_conf_unusuals
+all_unusuals = (
+    compilers_unusual
+    + feature_unusuals
+    + configure_flag_unusuals
+    + malloc_conf_unusuals
+)
 
 
 def get_extra_cflags(os, compiler):
@@ -175,8 +183,12 @@ def get_extra_cflags(os, compiler):
 def format_job(os, arch, combination):
     compilers = [x.value for x in combination if x.type == Option.Type.COMPILER]
     assert len(compilers) <= 1
-    compiler_flags = [x.value for x in combination if x.type == Option.Type.COMPILER_FLAG]
-    configure_flags = [x.value for x in combination if x.type == Option.Type.CONFIGURE_FLAG]
+    compiler_flags = [
+        x.value for x in combination if x.type == Option.Type.COMPILER_FLAG
+    ]
+    configure_flags = [
+        x.value for x in combination if x.type == Option.Type.CONFIGURE_FLAG
+    ]
     malloc_conf = [x.value for x in combination if x.type == Option.Type.MALLOC_CONF]
     features = [x.value for x in combination if x.type == Option.Type.FEATURE]
 
@@ -193,7 +205,7 @@ def format_job(os, arch, combination):
     if os == LINUX and cross_compile:
         compiler_flags.append("-m32")
 
-    features_str = " ".join([" {}=yes".format(feature) for feature in features])
+    features_str = " ".join([f" {feature}=yes" for feature in features])
 
     stringify = lambda arr, name: ' {}="{}"'.format(name, " ".join(arr)) if arr else ""
     env_string = "{}{}{}{}{}{}".format(
@@ -205,9 +217,9 @@ def format_job(os, arch, combination):
         extra_environment_vars,
     )
 
-    job = "    - os: {}\n".format(os)
-    job += "      arch: {}\n".format(arch)
-    job += "      env: {}".format(env_string)
+    job = f"    - os: {os}\n"
+    job += f"      arch: {arch}\n"
+    job += f"      env: {env_string}"
     return job
 
 
@@ -218,7 +230,9 @@ def generate_unusual_combinations(unusuals, max_unusual_opts):
 
     @param max_unusual_opts: Limit of unusual options per combination.
     """
-    return chain.from_iterable([combinations(unusuals, i) for i in range(max_unusual_opts + 1)])
+    return chain.from_iterable(
+        [combinations(unusuals, i) for i in range(max_unusual_opts + 1)]
+    )
 
 
 def included(combination, exclude):

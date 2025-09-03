@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
+import argparse
 import glob
 import json
 import os
-import argparse
 
 ARG_TYPES = {
     "string": "ARG_TYPE_STRING",
@@ -56,7 +56,10 @@ def check_command_args_key_specs(
             assert isinstance(arg.key_spec_index, int)
 
             if arg.key_spec_index not in command_key_specs_index_set:
-                print("command: %s arg: %s key_spec_index error" % (command.fullname(), arg.name))
+                print(
+                    "command: %s arg: %s key_spec_index error"
+                    % (command.fullname(), arg.name)
+                )
                 return False
 
             command_arg_key_specs_index_set.add(arg.key_spec_index)
@@ -102,11 +105,13 @@ def check_command_key_specs(command):
 
 
 # Globals
-subcommands = {}  # container_name -> dict(subcommand_name -> Subcommand) - Only subcommands
+subcommands = (
+    {}
+)  # container_name -> dict(subcommand_name -> Subcommand) - Only subcommands
 commands = {}  # command_name -> Command - Only commands
 
 
-class KeySpec(object):
+class KeySpec:
     def __init__(self, spec):
         self.spec = spec
 
@@ -119,7 +124,9 @@ class KeySpec(object):
 
         def _begin_search_code():
             if self.spec["begin_search"].get("index"):
-                return "KSPEC_BS_INDEX,.bs.index={%d}" % (self.spec["begin_search"]["index"]["pos"])
+                return "KSPEC_BS_INDEX,.bs.index={%d}" % (
+                    self.spec["begin_search"]["index"]["pos"]
+                )
             elif self.spec["begin_search"].get("keyword"):
                 return 'KSPEC_BS_KEYWORD,.bs.keyword={"%s",%d}' % (
                     self.spec["begin_search"]["keyword"]["keyword"],
@@ -162,17 +169,19 @@ def verify_no_dup_names(container_fullname, args):
     name_list = [arg.name for arg in args]
     name_set = set(name_list)
     if len(name_list) != len(name_set):
-        print("{}: Dup argument names: {}".format(container_fullname, name_list))
+        print(f"{container_fullname}: Dup argument names: {name_list}")
         exit(1)
 
 
-class Argument(object):
+class Argument:
     def __init__(self, parent_name, desc):
         self.parent_name = parent_name
         self.desc = desc
         self.name = self.desc["name"].lower()
         if "_" in self.name:
-            print("{}: name ({}) should not contain underscores".format(self.fullname(), self.name))
+            print(
+                f"{self.fullname()}: name ({self.name}) should not contain underscores"
+            )
             exit(1)
         self.type = self.desc["type"]
         self.key_spec_index = self.desc.get("key_spec_index", None)
@@ -183,7 +192,7 @@ class Argument(object):
                 self.subargs.append(Argument(self.fullname(), subdesc))
             if len(self.subargs) < 2:
                 print(
-                    "{}: oneof or block arg contains less than two subargs".format(self.fullname())
+                    f"{self.fullname()}: oneof or block arg contains less than two subargs"
                 )
                 exit(1)
             verify_no_dup_names(self.fullname(), self.subargs)
@@ -260,7 +269,7 @@ def to_c_name(str):
     )
 
 
-class ReplySchema(object):
+class ReplySchema:
     def __init__(self, name, desc):
         self.name = to_c_name(name)
         self.schema = {}
@@ -288,7 +297,9 @@ class ReplySchema(object):
             elif isinstance(v, list):
                 self.schema[k] = []
                 for i, subdesc in enumerate(v):
-                    self.schema[k].append(ReplySchema("%s_%s_%i" % (self.name, k, i), subdesc))
+                    self.schema[k].append(
+                        ReplySchema("%s_%s_%i" % (self.name, k, i), subdesc)
+                    )
             else:
                 self.schema[k] = v
 
@@ -337,7 +348,7 @@ class ReplySchema(object):
         )
 
 
-class Command(object):
+class Command:
     def __init__(self, name, desc):
         self.name = name.upper()
         self.desc = desc
@@ -350,7 +361,9 @@ class Command(object):
         verify_no_dup_names(self.fullname(), self.args)
         self.reply_schema = None
         if "reply_schema" in self.desc:
-            self.reply_schema = ReplySchema(self.reply_schema_name(), self.desc["reply_schema"])
+            self.reply_schema = ReplySchema(
+                self.reply_schema_name(), self.desc["reply_schema"]
+            )
 
     def fullname(self):
         return self.name.replace("-", "_").replace(":", "")
@@ -436,28 +449,31 @@ class Command(object):
                 s += "CMD_DOC_%s|" % flag
             return s[:-1] if s else "CMD_DOC_NONE"
 
-        s = 'MAKE_CMD("%s",%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%s,%d,%s,%d,%s,%s,%s,%d,%s,%d),' % (
-            self.name.lower(),
-            get_optional_desc_string(self.desc, "summary"),
-            get_optional_desc_string(self.desc, "complexity"),
-            get_optional_desc_string(self.desc, "since"),
-            _doc_flags_code(),
-            get_optional_desc_string(self.desc, "replaced_by"),
-            get_optional_desc_string(self.desc, "deprecated_since"),
-            '"%s"' % self.group,
-            GROUPS[self.group],
-            self.history_table_name(),
-            self.num_history(),
-            self.tips_table_name(),
-            self.num_tips(),
-            self.desc.get("function", "NULL"),
-            self.desc["arity"],
-            _flags_code(),
-            _acl_categories_code(),
-            self.key_specs_table_name(),
-            len(self.key_specs),
-            self.desc.get("get_keys_function", "NULL"),
-            len(self.args),
+        s = (
+            'MAKE_CMD("%s",%s,%s,%s,%s,%s,%s,%s,%s,%s,%d,%s,%d,%s,%d,%s,%s,%s,%d,%s,%d),'
+            % (
+                self.name.lower(),
+                get_optional_desc_string(self.desc, "summary"),
+                get_optional_desc_string(self.desc, "complexity"),
+                get_optional_desc_string(self.desc, "since"),
+                _doc_flags_code(),
+                get_optional_desc_string(self.desc, "replaced_by"),
+                get_optional_desc_string(self.desc, "deprecated_since"),
+                '"%s"' % self.group,
+                GROUPS[self.group],
+                self.history_table_name(),
+                self.num_history(),
+                self.tips_table_name(),
+                self.num_tips(),
+                self.desc.get("function", "NULL"),
+                self.desc["arity"],
+                _flags_code(),
+                _acl_categories_code(),
+                self.key_specs_table_name(),
+                len(self.key_specs),
+                self.desc.get("get_keys_function", "NULL"),
+                len(self.args),
+            )
         )
 
         if self.subcommands:
@@ -512,7 +528,10 @@ class Command(object):
         f.write("/* %s key specs */\n" % self.fullname())
         code = self.key_specs_code()
         if code:
-            f.write("keySpec %s[%d] = {\n" % (self.key_specs_table_name(), len(self.key_specs)))
+            f.write(
+                "keySpec %s[%d] = {\n"
+                % (self.key_specs_table_name(), len(self.key_specs))
+            )
             f.write("%s\n" % code)
             f.write("};\n")
         else:
@@ -539,7 +558,10 @@ class Subcommand(Command):
         super(Subcommand, self).__init__(name, desc)
 
     def fullname(self):
-        return "%s %s" % (self.container_name, self.name.replace("-", "_").replace(":", ""))
+        return "%s %s" % (
+            self.container_name,
+            self.name.replace("-", "_").replace(":", ""),
+        )
 
 
 def create_command(name, desc):
@@ -568,7 +590,7 @@ args = parser.parse_args()
 # Create all command objects
 print("Processing json files...")
 for filename in glob.glob("%s/commands/*.json" % srcdir):
-    with open(filename, "r") as f:
+    with open(filename) as f:
         try:
             d = json.load(f)
             for name, desc in d.items():
@@ -588,7 +610,9 @@ for command in commands.values():
         subcommand.group = command.group
         command.subcommands.append(subcommand)
 
-check_command_error_counter = 0  # An error counter is used to count errors in command checking.
+check_command_error_counter = (
+    0  # An error counter is used to count errors in command checking.
+)
 
 print("Checking all commands...")
 for command in commands.values():
@@ -599,10 +623,15 @@ if check_command_error_counter != 0:
     print("Error: There are errors in the commands check, please check the above logs.")
     exit(1)
 
-commands_filename = "commands_with_reply_schema" if args.with_reply_schema else "commands"
+commands_filename = (
+    "commands_with_reply_schema" if args.with_reply_schema else "commands"
+)
 print("Generating %s.def..." % commands_filename)
 with open("%s/%s.def" % (srcdir, commands_filename), "w") as f:
-    f.write("/* Automatically generated by %s, do not edit. */\n\n" % os.path.basename(__file__))
+    f.write(
+        "/* Automatically generated by %s, do not edit. */\n\n"
+        % os.path.basename(__file__)
+    )
     f.write(
         """
 /* We have fabulous commands from

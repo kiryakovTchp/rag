@@ -1,5 +1,5 @@
-from test import TestCase, fill_redis_with_vectors, generate_random_vector
 import random
+from test import TestCase, fill_redis_with_vectors, generate_random_vector
 
 
 class LargeScale(TestCase):
@@ -53,7 +53,9 @@ class LargeScale(TestCase):
 
         # If test fails, print comparison for debugging
         if overlap < k * 0.7:
-            data.print_comparison({"items": redis_results, "query_vector": query_vec}, k)
+            data.print_comparison(
+                {"items": redis_results, "query_vector": query_vec}, k
+            )
 
         assert (
             overlap >= k * 0.7

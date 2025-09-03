@@ -11,4 +11,4 @@ values = [round(-mul * math.log(i / table_size)) for i in range(1, table_size + 
 print("mul =", mul)
 print("values:")
 for i in range(table_size // 8):
-    print(", ".join((str(x) for x in values[i * 8 : i * 8 + 8])))
+    print(", ".join(str(x) for x in values[i * 8 : i * 8 + 8]))

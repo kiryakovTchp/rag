@@ -1,7 +1,7 @@
-from test import TestCase, generate_random_vector
+import struct
 import threading
 import time
-import struct
+from test import TestCase, generate_random_vector
 
 
 class ThreadingStressTest(TestCase):

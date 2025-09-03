@@ -1,9 +1,9 @@
-from test import TestCase, generate_random_vector
-import struct
-import random
-import math
 import json
+import math
+import random
+import struct
 import time
+from test import TestCase, generate_random_vector
 
 
 class VSIMFilterAdvanced(TestCase):
@@ -43,9 +43,12 @@ class VSIMFilterAdvanced(TestCase):
         year = random.choice(self.years)
         in_stock = random.random() > 0.3  # 70% chance of being in stock
         rating = round(random.uniform(1, 5), 1)
-        views = int(random.expovariate(1 / 1000))  # Exponential distribution for page views
+        views = int(
+            random.expovariate(1 / 1000)
+        )  # Exponential distribution for page views
         tags = random.sample(
-            ["popular", "sale", "new", "limited", "exclusive", "clearance"], k=random.randint(0, 3)
+            ["popular", "sale", "new", "limited", "exclusive", "clearance"],
+            k=random.randint(0, 3),
         )
 
         # Add some specific patterns for testing
@@ -71,11 +74,15 @@ class VSIMFilterAdvanced(TestCase):
 
         # Add sub-categories for more complex filters
         if category == "electronics":
-            attrs["subcategory"] = random.choice(["phones", "computers", "cameras", "audio"])
+            attrs["subcategory"] = random.choice(
+                ["phones", "computers", "cameras", "audio"]
+            )
         elif category == "furniture":
             attrs["subcategory"] = random.choice(["chairs", "tables", "sofas", "beds"])
         elif category == "clothing":
-            attrs["subcategory"] = random.choice(["shirts", "pants", "dresses", "shoes"])
+            attrs["subcategory"] = random.choice(
+                ["shirts", "pants", "dresses", "shoes"]
+            )
 
         # Add some intentionally missing fields for testing
         if random.random() > 0.9:  # 10% chance of missing price
@@ -120,7 +127,9 @@ class VSIMFilterAdvanced(TestCase):
 
         return vectors, names, attribute_map
 
-    def filter_linear_search(self, vectors, names, query_vector, filter_expr, attribute_map, k=10):
+    def filter_linear_search(
+        self, vectors, names, query_vector, filter_expr, attribute_map, k=10
+    ):
         """Perform a linear search with filtering for verification"""
         similarities = []
         query_norm = math.sqrt(sum(x * x for x in query_vector))
@@ -203,11 +212,15 @@ class VSIMFilterAdvanced(TestCase):
                 # numbers or other types, or when an attribute doesn't exist
                 return False
             except Exception as e:
-                print(f"Error evaluating filter expression '{filter_expr}' as '{py_expr}': {e}")
+                print(
+                    f"Error evaluating filter expression '{filter_expr}' as '{py_expr}': {e}"
+                )
                 return False
 
         except Exception as e:
-            print(f"Error evaluating filter expression '{filter_expr}' as '{py_expr}': {e}")
+            print(
+                f"Error evaluating filter expression '{filter_expr}' as '{py_expr}': {e}"
+            )
             return False
 
     def safe_decode(self, item):
@@ -271,7 +284,9 @@ class VSIMFilterAdvanced(TestCase):
         # We expect high recall for standard parameters
         if ef >= 500 and (filter_ef is None or filter_ef >= 1000):
             try:
-                assert recall >= 0.7, f"Low recall {recall:.2f} for filter '{filter_expr}'"
+                assert (
+                    recall >= 0.7
+                ), f"Low recall {recall:.2f} for filter '{filter_expr}'"
             except AssertionError as e:
                 # Get items found in each set
                 redis_items_set = set(redis_items.keys())
@@ -293,7 +308,9 @@ class VSIMFilterAdvanced(TestCase):
                 if only_in_redis:
                     debug += "\n\nTOP 5 ITEMS ONLY IN REDIS:"
                     sorted_redis = sorted(
-                        [(k, v) for k, v in redis_items.items()], key=lambda x: x[1], reverse=True
+                        [(k, v) for k, v in redis_items.items()],
+                        key=lambda x: x[1],
+                        reverse=True,
                     )
                     for i, (item, score) in enumerate(sorted_redis[:5]):
                         if item in only_in_redis:
@@ -321,9 +338,7 @@ class VSIMFilterAdvanced(TestCase):
 
                 # Check for WITHSCORES handling issues
                 if len(redis_results) > 0 and len(redis_results) % 2 == 0:
-                    debug += (
-                        f"\nRedis returned {len(redis_results)} items (looks like item,score pairs)"
-                    )
+                    debug += f"\nRedis returned {len(redis_results)} items (looks like item,score pairs)"
                     debug += f"\nFirst few results: {redis_results[:4]}"
 
                 # Check the filter implementation
@@ -336,13 +351,18 @@ class VSIMFilterAdvanced(TestCase):
                         count_matching += 1
                         if i < 3:  # Show first 3 matches
                             debug += f"\n  - {name}: {attrs}"
-                debug += f"\nTotal items matching filter in attribute_map: {count_matching}"
+                debug += (
+                    f"\nTotal items matching filter in attribute_map: {count_matching}"
+                )
 
                 # Check if results array handling could be wrong
                 debug += "\n\nRESULT ARRAYS CHECK:"
                 if len(linear_results) >= 1:
                     debug += f"\nlinear_results[0]: {linear_results[0]}"
-                    if isinstance(linear_results[0], tuple) and len(linear_results[0]) == 2:
+                    if (
+                        isinstance(linear_results[0], tuple)
+                        and len(linear_results[0]) == 2
+                    ):
                         debug += " (correct tuple format: (name, score))"
                     else:
                         debug += " (UNEXPECTED FORMAT!)"
@@ -360,13 +380,15 @@ class VSIMFilterAdvanced(TestCase):
         return recall, selectivity, query_time, len(redis_items)
 
     def test(self):
-        print(f"\nRunning comprehensive VSIM FILTER tests...")
+        print("\nRunning comprehensive VSIM FILTER tests...")
 
         # Create a larger dataset for testing
         print(f"Creating dataset with {self.count} vectors and attributes...")
-        self.vectors, self.names, self.attribute_map = self.create_vectors_with_attributes(
-            self.test_key, self.count
-        )
+        (
+            self.vectors,
+            self.names,
+            self.attribute_map,
+        ) = self.create_vectors_with_attributes(self.test_key, self.count)
 
         # ==== 1. Recall and Precision Testing ====
         print("Testing recall for various filters...")
@@ -384,13 +406,17 @@ class VSIMFilterAdvanced(TestCase):
         print("Filter | Recall | Selectivity | Time (ms) | Results")
         print("----------------------------------------------------")
         for name, (recall, selectivity, time_ms, count) in results.items():
-            print(f"{name:7} | {recall:.3f} | {selectivity:.3f} | {time_ms*1000:.1f} | {count}")
+            print(
+                f"{name:7} | {recall:.3f} | {selectivity:.3f} | {time_ms*1000:.1f} | {count}"
+            )
 
         # ==== 2. Filter Selectivity Performance ====
         print("\nTesting filter selectivity performance...")
 
         # High selectivity (very few matches)
-        high_sel_recall, _, high_sel_time, _ = self.test_recall_with_filter(".is_premium")
+        high_sel_recall, _, high_sel_time, _ = self.test_recall_with_filter(
+            ".is_premium"
+        )
 
         # Medium selectivity
         med_sel_recall, _, med_sel_time, _ = self.test_recall_with_filter(
@@ -398,11 +424,19 @@ class VSIMFilterAdvanced(TestCase):
         )
 
         # Low selectivity (many matches)
-        low_sel_recall, _, low_sel_time, _ = self.test_recall_with_filter(".year > 2000")
+        low_sel_recall, _, low_sel_time, _ = self.test_recall_with_filter(
+            ".year > 2000"
+        )
 
-        print(f"High selectivity recall: {high_sel_recall:.3f}, time: {high_sel_time*1000:.1f}ms")
-        print(f"Med selectivity recall: {med_sel_recall:.3f}, time: {med_sel_time*1000:.1f}ms")
-        print(f"Low selectivity recall: {low_sel_recall:.3f}, time: {low_sel_time*1000:.1f}ms")
+        print(
+            f"High selectivity recall: {high_sel_recall:.3f}, time: {high_sel_time*1000:.1f}ms"
+        )
+        print(
+            f"Med selectivity recall: {med_sel_recall:.3f}, time: {med_sel_time*1000:.1f}ms"
+        )
+        print(
+            f"Low selectivity recall: {low_sel_recall:.3f}, time: {low_sel_time*1000:.1f}ms"
+        )
 
         # ==== 3. FILTER-EF Parameter Testing ====
         print("\nTesting FILTER-EF parameter...")
@@ -420,8 +454,12 @@ class VSIMFilterAdvanced(TestCase):
             print(f"{filter_ef:9} | {recall:.3f} | {query_time*1000:.1f}")
 
         # Assert that higher FILTER-EF generally gives better recall
-        low_ef_recall, _, _, _ = self.test_recall_with_filter(filter_expr, filter_ef=100)
-        high_ef_recall, _, _, _ = self.test_recall_with_filter(filter_expr, filter_ef=5000)
+        low_ef_recall, _, _, _ = self.test_recall_with_filter(
+            filter_expr, filter_ef=100
+        )
+        high_ef_recall, _, _, _ = self.test_recall_with_filter(
+            filter_expr, filter_ef=5000
+        )
 
         # This might not always be true due to randomness, but generally holds
         # We use a softer assertion to avoid flaky tests
@@ -483,10 +521,14 @@ class VSIMFilterAdvanced(TestCase):
             cmd_args.extend(["COUNT", count, "WITHSCORES", "FILTER", filter_expr])
 
             results = self.redis.execute_command(*cmd_args)
-            result_count = len(results) // 2  # Divide by 2 because WITHSCORES returns pairs
+            result_count = (
+                len(results) // 2
+            )  # Divide by 2 because WITHSCORES returns pairs
 
             # We expect result count to be at most the requested count
-            assert result_count <= count, f"Got {result_count} results with COUNT {count}"
+            assert (
+                result_count <= count
+            ), f"Got {result_count} results with COUNT {count}"
             print(f"COUNT {count:3} | Got {result_count:3} results")
 
         # ==== 7. Edge Cases ====
@@ -503,7 +545,9 @@ class VSIMFilterAdvanced(TestCase):
             "FILTER",
             no_match_expr,
         )
-        assert len(results) == 0, f"Expected 0 results for non-matching filter, got {len(results)}"
+        assert (
+            len(results) == 0
+        ), f"Expected 0 results for non-matching filter, got {len(results)}"
         print(f"No matching items: {len(results)} results (expected 0)")
 
         # Test with invalid filter syntax
@@ -558,7 +602,9 @@ class VSIMFilterSelectivityTest(TestCase):
         vec = generate_random_vector(self.dim)
         vec_bytes = struct.pack(f"{self.dim}f", *vec)
         self.redis.execute_command("VADD", self.test_key, "FP32", vec_bytes, name)
-        self.redis.execute_command("VSETATTR", self.test_key, name, json.dumps({"age": age}))
+        self.redis.execute_command(
+            "VSETATTR", self.test_key, name, json.dumps({"age": age})
+        )
 
     def test(self):
         print("\nRunning VSIM FILTER selectivity benchmark...")
@@ -597,7 +643,9 @@ class VSIMFilterSelectivityTest(TestCase):
             results = self.redis.execute_command(*cmd_args)
             query_time = time.time() - start_time
 
-            actual_selectivity = len(results) / min(100, int(target_selectivity * self.count))
+            actual_selectivity = len(results) / min(
+                100, int(target_selectivity * self.count)
+            )
             print(
                 f"{target_selectivity:.2f}      | {filter_expr:15} | {len(results):7} | {query_time*1000:.1f}"
             )
@@ -609,7 +657,9 @@ class VSIMFilterSelectivityTest(TestCase):
                 assert len(results) > 0, f"No results found for {filter_expr}"
             else:
                 # For less selective queries, performance should be reasonable
-                assert query_time < 1.0, f"Query too slow: {query_time:.3f}s for {filter_expr}"
+                assert (
+                    query_time < 1.0
+                ), f"Query too slow: {query_time:.3f}s for {filter_expr}"
 
         print("\nSelectivity benchmark completed successfully")
 
@@ -652,7 +702,9 @@ class VSIMFilterComparisonTest(TestCase):
 
             attrs = {"id": i, "category": category, "quality": quality}
 
-            self.redis.execute_command("VSETATTR", self.test_key, name, json.dumps(attrs))
+            self.redis.execute_command(
+                "VSETATTR", self.test_key, name, json.dumps(attrs)
+            )
             vectors.append(vec)
             names.append(name)
 
@@ -693,7 +745,11 @@ class VSIMFilterComparisonTest(TestCase):
             if baseline_count is None:
                 baseline_count = len(query_results)
 
-            recall_rate = len(query_results) / max(1, baseline_count) if baseline_count > 0 else 1.0
+            recall_rate = (
+                len(query_results) / max(1, baseline_count)
+                if baseline_count > 0
+                else 1.0
+            )
 
             notes = ""
             if ef == 5000:

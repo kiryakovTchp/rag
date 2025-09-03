@@ -1,5 +1,4 @@
-from test import TestCase, generate_random_vector, fill_redis_with_vectors
-import struct
+from test import TestCase, fill_redis_with_vectors
 
 
 class VRANDMEMBERTest(TestCase):
@@ -28,8 +27,12 @@ class VRANDMEMBERTest(TestCase):
 
         # Test multiple unique members (positive count)
         positive_count = 10
-        result = self.redis.execute_command("VRANDMEMBER", self.test_key, positive_count)
-        assert isinstance(result, list), "VRANDMEMBER with positive count should return an array"
+        result = self.redis.execute_command(
+            "VRANDMEMBER", self.test_key, positive_count
+        )
+        assert isinstance(
+            result, list
+        ), "VRANDMEMBER with positive count should return an array"
         assert len(result) == positive_count, f"Should return {positive_count} members"
 
         # Check for uniqueness
@@ -48,9 +51,15 @@ class VRANDMEMBERTest(TestCase):
 
         # Test with duplicates (negative count)
         negative_count = -20
-        result = self.redis.execute_command("VRANDMEMBER", self.test_key, negative_count)
-        assert isinstance(result, list), "VRANDMEMBER with negative count should return an array"
-        assert len(result) == abs(negative_count), f"Should return {abs(negative_count)} members"
+        result = self.redis.execute_command(
+            "VRANDMEMBER", self.test_key, negative_count
+        )
+        assert isinstance(
+            result, list
+        ), "VRANDMEMBER with negative count should return an array"
+        assert len(result) == abs(
+            negative_count
+        ), f"Should return {abs(negative_count)} members"
 
         # Check that all returned elements are valid
         decoded_results = [r.decode() for r in result]

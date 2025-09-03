@@ -8,10 +8,11 @@
 #
 
 #!/usr/bin/env python3
-import redis
-import requests
 import re
 import shlex
+
+import redis
+import requests
 from prompt_toolkit import PromptSession
 from prompt_toolkit.history import InMemoryHistory
 

@@ -1,28 +1,30 @@
 """Feedback schemas."""
 
-from datetime import datetime
-from typing import Optional, List
+from typing import Optional
+
 from pydantic import BaseModel
 
 
 class FeedbackCreate(BaseModel):
-    """Schema for creating feedback."""
+    """Feedback creation request."""
+
     answer_id: str
-    rating: str  # 'up' or 'down'
+    rating: int  # 1-5 scale
     reason: Optional[str] = None
-    selected_citation_ids: Optional[List[int]] = None
+    selected_citation_ids: list[int] = []
 
 
 class FeedbackResponse(BaseModel):
-    """Schema for feedback response."""
+    """Feedback response."""
+
     id: int
     answer_id: str
     tenant_id: str
-    user_id: Optional[str]
-    rating: str
-    reason: Optional[str]
-    selected_citation_ids: Optional[List[int]]
-    created_at: datetime
+    user_id: Optional[str] = None
+    rating: int
+    reason: Optional[str] = None
+    selected_citation_ids: list[int] = []
+    created_at: str
 
     class Config:
         from_attributes = True
@@ -30,6 +32,7 @@ class FeedbackResponse(BaseModel):
 
 class FeedbackStats(BaseModel):
     """Statistics for feedback."""
+
     total_feedback: int
     positive_feedback: int
     negative_feedback: int

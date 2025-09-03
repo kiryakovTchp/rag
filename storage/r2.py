@@ -1,5 +1,5 @@
-import os
 import logging
+import os
 from typing import BinaryIO
 
 import boto3
@@ -13,11 +13,11 @@ class ObjectStore:
         self.endpoint = os.getenv("S3_ENDPOINT", "http://minio:9000")
         self.region = os.getenv("S3_REGION", "us-east-1")
         self.bucket = os.getenv("S3_BUCKET", "promoai")
-        
+
         # Check for S3 credentials
         self.access_key = os.getenv("S3_ACCESS_KEY_ID")
         self.secret_key = os.getenv("S3_SECRET_ACCESS_KEY")
-        
+
         if not self.access_key or not self.secret_key:
             logger.warning(
                 "S3_ACCESS_KEY_ID or S3_SECRET_ACCESS_KEY not set. "

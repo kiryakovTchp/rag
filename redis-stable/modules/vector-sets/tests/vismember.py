@@ -1,5 +1,5 @@
-from test import TestCase, generate_random_vector
 import struct
+from test import TestCase, generate_random_vector
 
 
 class BasicVISMEMBER(TestCase):
@@ -24,25 +24,39 @@ class BasicVISMEMBER(TestCase):
 
         # Test VISMEMBER with existing elements
         result1 = self.redis.execute_command("VISMEMBER", self.test_key, item1)
-        assert result1 == 1, f"VISMEMBER should return 1 for existing item, got {result1}"
+        assert (
+            result1 == 1
+        ), f"VISMEMBER should return 1 for existing item, got {result1}"
 
         result2 = self.redis.execute_command("VISMEMBER", self.test_key, item2)
-        assert result2 == 1, f"VISMEMBER should return 1 for existing item, got {result2}"
+        assert (
+            result2 == 1
+        ), f"VISMEMBER should return 1 for existing item, got {result2}"
 
         # Test VISMEMBER with non-existent element
-        result3 = self.redis.execute_command("VISMEMBER", self.test_key, nonexistent_item)
-        assert result3 == 0, f"VISMEMBER should return 0 for non-existent item, got {result3}"
+        result3 = self.redis.execute_command(
+            "VISMEMBER", self.test_key, nonexistent_item
+        )
+        assert (
+            result3 == 0
+        ), f"VISMEMBER should return 0 for non-existent item, got {result3}"
 
         # Test VISMEMBER with non-existent key
         nonexistent_key = f"{self.test_key}_nonexistent"
         result4 = self.redis.execute_command("VISMEMBER", nonexistent_key, item1)
-        assert result4 == 0, f"VISMEMBER should return 0 for non-existent key, got {result4}"
+        assert (
+            result4 == 0
+        ), f"VISMEMBER should return 0 for non-existent key, got {result4}"
 
         # Test VISMEMBER after removing an element
         self.redis.execute_command("VREM", self.test_key, item1)
         result5 = self.redis.execute_command("VISMEMBER", self.test_key, item1)
-        assert result5 == 0, f"VISMEMBER should return 0 after element removal, got {result5}"
+        assert (
+            result5 == 0
+        ), f"VISMEMBER should return 0 after element removal, got {result5}"
 
         # Verify item2 still exists
         result6 = self.redis.execute_command("VISMEMBER", self.test_key, item2)
-        assert result6 == 1, f"VISMEMBER should still return 1 for remaining item, got {result6}"
+        assert (
+            result6 == 1
+        ), f"VISMEMBER should still return 1 for remaining item, got {result6}"

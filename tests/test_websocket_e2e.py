@@ -3,12 +3,12 @@
 import asyncio
 import json
 import os
+import subprocess
+from typing import Any
+from unittest.mock import patch
+
 import pytest
 import websockets
-import subprocess
-
-from typing import List, Dict, Any
-from unittest.mock import patch
 
 from services.events.bus import publish_event
 
@@ -17,7 +17,7 @@ class WebSocketE2ETest:
     """E2E WebSocket test runner with real uvicorn server."""
 
     def __init__(self):
-        self.received_messages: List[Dict[str, Any]] = []
+        self.received_messages: list[dict[str, Any]] = []
         self.websocket = None
         self.uvicorn_process = None
 
@@ -47,7 +47,9 @@ class WebSocketE2ETest:
                     import httpx
 
                     async with httpx.AsyncClient() as client:
-                        response = await client.get("http://localhost:8000/healthz", timeout=5)
+                        response = await client.get(
+                            "http://localhost:8000/healthz", timeout=5
+                        )
                         if response.status_code == 200:
                             print("✅ Uvicorn server started successfully")
                             return True
@@ -66,31 +68,43 @@ class WebSocketE2ETest:
             # Start uvicorn with invalid Redis URL
             env = os.environ.copy()
             env["REDIS_URL"] = "redis://localhost:6380"  # Non-existent port
-            
-            self.uvicorn_process = subprocess.Popen([
-                "uvicorn", "api.main:app", 
-                "--host", "0.0.0.0", 
-                "--port", "8000",
-                "--log-level", "error"
-            ], env=env)
-            
+
+            self.uvicorn_process = subprocess.Popen(
+                [
+                    "uvicorn",
+                    "api.main:app",
+                    "--host",
+                    "0.0.0.0",
+                    "--port",
+                    "8000",
+                    "--log-level",
+                    "error",
+                ],
+                env=env,
+            )
+
             # Wait for server to start
             await asyncio.sleep(3)
-            
+
             # Check if server is responding
             for _ in range(10):
                 try:
                     import httpx
+
                     async with httpx.AsyncClient() as client:
-                        response = await client.get("http://localhost:8000/healthz", timeout=5)
+                        response = await client.get(
+                            "http://localhost:8000/healthz", timeout=5
+                        )
                         if response.status_code == 200:
-                            print("✅ Uvicorn server started successfully with invalid Redis")
+                            print(
+                                "✅ Uvicorn server started successfully with invalid Redis"
+                            )
                             return True
                 except Exception:
                     await asyncio.sleep(1)
-            
+
             raise Exception("Failed to start uvicorn server")
-            
+
         except Exception as e:
             print(f"❌ Failed to start uvicorn: {e}")
             return False
@@ -215,8 +229,12 @@ async def test_websocket_e2e_redis_pubsub():
 
         # Check message order and content
         messages = test_runner.received_messages
-        assert any(m["event"] == "parse_started" for m in messages), "Missing parse_started event"
-        assert any(m["event"] == "parse_done" for m in messages), "Missing parse_done event"
+        assert any(
+            m["event"] == "parse_started" for m in messages
+        ), "Missing parse_started event"
+        assert any(
+            m["event"] == "parse_done" for m in messages
+        ), "Missing parse_done event"
 
         # Check message structure
         for message in messages:
@@ -238,13 +256,13 @@ async def test_websocket_e2e_redis_pubsub():
 async def test_websocket_redis_unavailable():
     """Test WebSocket behavior when Redis is unavailable."""
     test_runner = WebSocketE2ETest()
-    
+
     try:
         # 1. Start uvicorn server with invalid Redis URL
         print("🚀 Starting uvicorn server with invalid Redis...")
         success = await test_runner.start_uvicorn_with_invalid_redis()
         assert success, "Failed to start uvicorn server"
-        
+
         # 2. Try to connect to WebSocket (should fail gracefully)
         try:
             await test_runner.connect_websocket("test_tenant_123")
@@ -256,13 +274,15 @@ async def test_websocket_redis_unavailable():
             # WebSocket should close with controlled error code
             print(f"✅ WebSocket closed as expected: {e}")
             # Check if it's a controlled close (code 4000/4001)
-            if hasattr(e, 'code') and e.code in [4000, 4001]:
+            if hasattr(e, "code") and e.code in [4000, 4001]:
                 print(f"✅ WebSocket closed with expected error code: {e.code}")
             else:
-                print(f"⚠️ WebSocket closed with unexpected code: {getattr(e, 'code', 'unknown')}")
+                print(
+                    f"⚠️ WebSocket closed with unexpected code: {getattr(e, 'code', 'unknown')}"
+                )
         except Exception as e:
             print(f"✅ WebSocket failed as expected when Redis unavailable: {e}")
-        
+
     except Exception as e:
         print(f"❌ Redis unavailable test failed: {e}")
         raise

@@ -1,7 +1,7 @@
-from test import TestCase, generate_random_vector
-import struct
 import json
 import random
+import struct
+from test import TestCase, generate_random_vector
 
 
 class VSIMWithAttribs(TestCase):
@@ -33,7 +33,9 @@ class VSIMWithAttribs(TestCase):
             price = random.randint(50, 1000)
             attrs = {"category": category, "price": price, "id": i}
 
-            self.redis.execute_command("VSETATTR", self.test_key, name, json.dumps(attrs))
+            self.redis.execute_command(
+                "VSETATTR", self.test_key, name, json.dumps(attrs)
+            )
 
     def is_numeric(self, value):
         """Check if a value can be converted to float"""
@@ -63,8 +65,12 @@ class VSIMWithAttribs(TestCase):
         results_resp3 = self.redis3.execute_command(*cmd_args)
 
         # Both should return simple arrays of item names
-        assert len(results_resp2) == 5, f"RESP2: Expected 5 results, got {len(results_resp2)}"
-        assert len(results_resp3) == 5, f"RESP3: Expected 5 results, got {len(results_resp3)}"
+        assert (
+            len(results_resp2) == 5
+        ), f"RESP2: Expected 5 results, got {len(results_resp2)}"
+        assert (
+            len(results_resp3) == 5
+        ), f"RESP3: Expected 5 results, got {len(results_resp3)}"
         assert all(
             isinstance(item, bytes) for item in results_resp2
         ), "RESP2: Results should be byte strings"
@@ -85,8 +91,12 @@ class VSIMWithAttribs(TestCase):
             len(results_resp2) == 10
         ), f"RESP2: Expected 10 elements (5 items × 2), got {len(results_resp2)}"
         for i in range(0, len(results_resp2), 2):
-            assert isinstance(results_resp2[i], bytes), f"RESP2: Item at {i} should be bytes"
-            assert self.is_numeric(results_resp2[i + 1]), f"RESP2: Score at {i+1} should be numeric"
+            assert isinstance(
+                results_resp2[i], bytes
+            ), f"RESP2: Item at {i} should be bytes"
+            assert self.is_numeric(
+                results_resp2[i + 1]
+            ), f"RESP2: Score at {i+1} should be numeric"
             score = (
                 float(results_resp2[i + 1])
                 if isinstance(results_resp2[i + 1], bytes)
@@ -95,17 +105,25 @@ class VSIMWithAttribs(TestCase):
             assert 0 <= score <= 1, f"RESP2: Score {score} should be between 0 and 1"
 
         # RESP3: Should be a dict/map with items as keys and scores as DIRECT values (not arrays)
-        assert isinstance(results_resp3, dict), f"RESP3: Expected dict, got {type(results_resp3)}"
-        assert len(results_resp3) == 5, f"RESP3: Expected 5 entries, got {len(results_resp3)}"
+        assert isinstance(
+            results_resp3, dict
+        ), f"RESP3: Expected dict, got {type(results_resp3)}"
+        assert (
+            len(results_resp3) == 5
+        ), f"RESP3: Expected 5 entries, got {len(results_resp3)}"
         for item, score in results_resp3.items():
-            assert isinstance(item, bytes), f"RESP3: Key should be bytes"
+            assert isinstance(item, bytes), "RESP3: Key should be bytes"
             # Score should be a direct value, NOT an array
             assert not isinstance(
                 score, list
-            ), f"RESP3: With single WITH option, value should not be array"
-            assert self.is_numeric(score), f"RESP3: Score should be numeric, got {type(score)}"
+            ), "RESP3: With single WITH option, value should not be array"
+            assert self.is_numeric(
+                score
+            ), f"RESP3: Score should be numeric, got {type(score)}"
             score_val = float(score) if isinstance(score, bytes) else score
-            assert 0 <= score_val <= 1, f"RESP3: Score {score_val} should be between 0 and 1"
+            assert (
+                0 <= score_val <= 1
+            ), f"RESP3: Score {score_val} should be between 0 and 1"
 
         # Test 3: VSIM with WITHATTRIBS only
         cmd_args = ["VSIM", self.test_key, "VALUES", self.dim]
@@ -120,7 +138,9 @@ class VSIMWithAttribs(TestCase):
             len(results_resp2) == 10
         ), f"RESP2: Expected 10 elements (5 items × 2), got {len(results_resp2)}"
         for i in range(0, len(results_resp2), 2):
-            assert isinstance(results_resp2[i], bytes), f"RESP2: Item at {i} should be bytes"
+            assert isinstance(
+                results_resp2[i], bytes
+            ), f"RESP2: Item at {i} should be bytes"
             attr = results_resp2[i + 1]
             assert attr is None or isinstance(
                 attr, bytes
@@ -130,17 +150,21 @@ class VSIMWithAttribs(TestCase):
                 json.loads(attr)
 
         # RESP3: Should be a dict/map with items as keys and attributes as DIRECT values (not arrays)
-        assert isinstance(results_resp3, dict), f"RESP3: Expected dict, got {type(results_resp3)}"
-        assert len(results_resp3) == 5, f"RESP3: Expected 5 entries, got {len(results_resp3)}"
+        assert isinstance(
+            results_resp3, dict
+        ), f"RESP3: Expected dict, got {type(results_resp3)}"
+        assert (
+            len(results_resp3) == 5
+        ), f"RESP3: Expected 5 entries, got {len(results_resp3)}"
         for item, attr in results_resp3.items():
-            assert isinstance(item, bytes), f"RESP3: Key should be bytes"
+            assert isinstance(item, bytes), "RESP3: Key should be bytes"
             # Attribute should be a direct value, NOT an array
             assert not isinstance(
                 attr, list
-            ), f"RESP3: With single WITH option, value should not be array"
+            ), "RESP3: With single WITH option, value should not be array"
             assert attr is None or isinstance(
                 attr, bytes
-            ), f"RESP3: Attribute should be None or bytes"
+            ), "RESP3: Attribute should be None or bytes"
             if attr is not None:
                 # Verify it's valid JSON
                 json.loads(attr)
@@ -158,8 +182,12 @@ class VSIMWithAttribs(TestCase):
             len(results_resp2) == 15
         ), f"RESP2: Expected 15 elements (5 items × 3), got {len(results_resp2)}"
         for i in range(0, len(results_resp2), 3):
-            assert isinstance(results_resp2[i], bytes), f"RESP2: Item at {i} should be bytes"
-            assert self.is_numeric(results_resp2[i + 1]), f"RESP2: Score at {i+1} should be numeric"
+            assert isinstance(
+                results_resp2[i], bytes
+            ), f"RESP2: Item at {i} should be bytes"
+            assert self.is_numeric(
+                results_resp2[i + 1]
+            ), f"RESP2: Score at {i+1} should be numeric"
             score = (
                 float(results_resp2[i + 1])
                 if isinstance(results_resp2[i + 1], bytes)
@@ -172,10 +200,14 @@ class VSIMWithAttribs(TestCase):
             ), f"RESP2: Attribute at {i+2} should be None or bytes"
 
         # RESP3: Should be a dict where each value is a 2-element array [score, attribute]
-        assert isinstance(results_resp3, dict), f"RESP3: Expected dict, got {type(results_resp3)}"
-        assert len(results_resp3) == 5, f"RESP3: Expected 5 entries, got {len(results_resp3)}"
+        assert isinstance(
+            results_resp3, dict
+        ), f"RESP3: Expected dict, got {type(results_resp3)}"
+        assert (
+            len(results_resp3) == 5
+        ), f"RESP3: Expected 5 entries, got {len(results_resp3)}"
         for item, value in results_resp3.items():
-            assert isinstance(item, bytes), f"RESP3: Key should be bytes"
+            assert isinstance(item, bytes), "RESP3: Key should be bytes"
             # With BOTH options, value MUST be an array
             assert isinstance(
                 value, list
@@ -185,12 +217,14 @@ class VSIMWithAttribs(TestCase):
             ), f"RESP3: Value should have 2 elements [score, attr], got {len(value)}"
 
             score, attr = value
-            assert self.is_numeric(score), f"RESP3: Score should be numeric"
+            assert self.is_numeric(score), "RESP3: Score should be numeric"
             score_val = float(score) if isinstance(score, bytes) else score
-            assert 0 <= score_val <= 1, f"RESP3: Score {score_val} should be between 0 and 1"
+            assert (
+                0 <= score_val <= 1
+            ), f"RESP3: Score {score_val} should be between 0 and 1"
             assert attr is None or isinstance(
                 attr, bytes
-            ), f"RESP3: Attribute should be None or bytes"
+            ), "RESP3: Attribute should be None or bytes"
 
         # Test 5: Verify consistency - same items returned in same order
         cmd_args = ["VSIM", self.test_key, "VALUES", self.dim]
@@ -207,7 +241,9 @@ class VSIMWithAttribs(TestCase):
         items_resp3 = list(results_resp3.keys())
 
         # Verify same items returned
-        assert set(items_resp2) == set(items_resp3), "RESP2 and RESP3 should return the same items"
+        assert set(items_resp2) == set(
+            items_resp3
+        ), "RESP2 and RESP3 should return the same items"
 
         # Build a mapping from items to scores and attributes for comparison
         data_resp2 = {}
@@ -252,4 +288,6 @@ class VSIMWithAttribs(TestCase):
         results2_resp3 = self.redis3.execute_command(*cmd_args2)
 
         # Both should return the same structure
-        assert results1_resp3 == results2_resp3, "Order of WITH options shouldn't matter"
+        assert (
+            results1_resp3 == results2_resp3
+        ), "Order of WITH options shouldn't matter"

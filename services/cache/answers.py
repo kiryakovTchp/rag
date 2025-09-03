@@ -1,143 +1,171 @@
-"""Answer caching service."""
+"""Answer caching service using Redis."""
 
-import hashlib
 import json
-import os
-from typing import Optional, Dict, Any
-from datetime import datetime, timedelta
+import logging
+from typing import Optional
 
 import redis
 
+logger = logging.getLogger(__name__)
+
 
 class AnswerCache:
-    """Cache for answer responses."""
-    
-    def __init__(self):
-        """Initialize cache with Redis connection."""
-        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
-        self.redis = redis.from_url(redis_url, decode_responses=True)
-        self.ttl = int(os.getenv("ANSWER_CACHE_TTL", "300"))  # 5 minutes default
-    
-    def _generate_key(
-        self,
-        tenant_id: Optional[str],
-        query: str,
-        top_k: int,
-        rerank: bool,
-        max_ctx: int,
-        model: str
-    ) -> str:
-        """Generate cache key from parameters."""
-        # Create a hash of the parameters
-        key_data = {
-            "tenant_id": tenant_id or "",
-            "query": query,
-            "top_k": top_k,
-            "rerank": rerank,
-            "max_ctx": max_ctx,
-            "model": model
-        }
-        
-        key_string = json.dumps(key_data, sort_keys=True)
-        return f"answer:{hashlib.sha256(key_string.encode()).hexdigest()}"
-    
-    def get(
-        self,
-        tenant_id: Optional[str],
-        query: str,
-        top_k: int,
-        rerank: bool,
-        max_ctx: int,
-        model: str
-    ) -> Optional[Dict[str, Any]]:
-        """Get cached answer.
-        
+    """Cache for storing and retrieving answer results."""
+
+    def __init__(self, redis_url: str = "redis://localhost:6379"):
+        """Initialize answer cache.
+
         Args:
+            redis_url: Redis connection URL
+        """
+        try:
+            self.redis = redis.from_url(redis_url, decode_responses=True)
+            # Test connection
+            self.redis.ping()
+            logger.info("Connected to Redis for answer caching")
+        except Exception as e:
+            logger.error(f"Failed to connect to Redis: {e}")
+            self.redis = None
+
+    def _make_key(self, query: str, tenant_id: str) -> str:
+        """Create cache key for query and tenant."""
+        return f"answer:{tenant_id}:{hash(query)}"
+
+    def get_cached_answer(self, query: str, tenant_id: str) -> Optional[dict]:
+        """Get cached answer for query.
+
+        Args:
+            query: Search query
             tenant_id: Tenant identifier
-            query: User query
-            top_k: Number of chunks retrieved
-            rerank: Whether reranking was applied
-            max_ctx: Maximum context tokens
-            model: LLM model used
-            
+
         Returns:
             Cached answer data or None if not found
         """
-        key = self._generate_key(tenant_id, query, top_k, rerank, max_ctx, model)
-        
+        if not self.redis:
+            return None
+
         try:
+            key = self._make_key(query, tenant_id)
             cached_data = self.redis.get(key)
+
             if cached_data:
-                data = json.loads(cached_data)
-                # Update latency to current time
-                data["usage"]["latency_ms"] = 0  # Cache hit
-                return data
-        except (json.JSONDecodeError, redis.RedisError):
-            pass
-        
-        return None
-    
-    def set(
+                logger.info(f"Cache hit for query: {query[:50]}...")
+                return json.loads(cached_data)
+
+            logger.info(f"Cache miss for query: {query[:50]}...")
+            return None
+
+        except Exception as e:
+            logger.error(f"Failed to get cached answer: {e}")
+            return None
+
+    def cache_answer(
         self,
-        tenant_id: Optional[str],
         query: str,
-        top_k: int,
-        rerank: bool,
-        max_ctx: int,
-        model: str,
+        tenant_id: str,
         answer: str,
-        citations: list,
-        usage: dict
-    ) -> None:
-        """Cache answer response.
-        
+        citations: list[dict],
+        usage: dict,
+        ttl: int = 3600,
+    ) -> bool:
+        """Cache answer result.
+
         Args:
+            query: Search query
             tenant_id: Tenant identifier
-            query: User query
-            top_k: Number of chunks retrieved
-            rerank: Whether reranking was applied
-            max_ctx: Maximum context tokens
-            model: LLM model used
             answer: Generated answer
-            citations: Citation list
+            citations: List of citations
             usage: Usage information
+            ttl: Time to live in seconds
+
+        Returns:
+            True if cached successfully, False otherwise
         """
-        key = self._generate_key(tenant_id, query, top_k, rerank, max_ctx, model)
-        
-        cache_data = {
-            "answer": answer,
-            "citations": citations,
-            "usage": usage,
-            "tenant_id": tenant_id
-        }
-        
+        if not self.redis:
+            return False
+
         try:
-            self.redis.setex(
-                key,
-                self.ttl,
-                json.dumps(cache_data)
-            )
-        except redis.RedisError:
-            # Silently fail if Redis is unavailable
-            pass
-    
-    def invalidate_tenant(self, tenant_id: str) -> None:
-        """Invalidate all cache entries for a tenant.
-        
+            key = self._make_key(query, tenant_id)
+            data = {
+                "answer": answer,
+                "citations": citations,
+                "usage": usage,
+                "tenant_id": tenant_id,
+            }
+
+            # Store in Redis with TTL
+            self.redis.setex(key, ttl, json.dumps(data))
+            logger.info(f"Cached answer for query: {query[:50]}...")
+            return True
+
+        except Exception as e:
+            logger.error(f"Failed to cache answer: {e}")
+            return False
+
+    def invalidate_cache(self, tenant_id: str, pattern: str = "*") -> int:
+        """Invalidate cache entries for tenant.
+
         Args:
             tenant_id: Tenant identifier
+            pattern: Pattern to match keys
+
+        Returns:
+            Number of keys invalidated
         """
+        if not self.redis:
+            return 0
+
         try:
-            # Find all keys for this tenant
-            pattern = f"answer:*"
+            pattern = f"answer:{tenant_id}:{pattern}"
             keys = self.redis.keys(pattern)
-            
+
+            if keys:
+                deleted = self.redis.delete(*keys)
+                logger.info(
+                    f"Invalidated {deleted} cache entries for tenant {tenant_id}"
+                )
+                return deleted
+
+            return 0
+
+        except Exception as e:
+            logger.error(f"Failed to invalidate cache: {e}")
+            return 0
+
+    def get_cache_stats(self, tenant_id: str) -> dict:
+        """Get cache statistics for tenant.
+
+        Args:
+            tenant_id: Tenant identifier
+
+        Returns:
+            Dictionary with cache statistics
+        """
+        if not self.redis:
+            return {"error": "Redis not available"}
+
+        try:
+            pattern = f"answer:{tenant_id}:*"
+            keys = self.redis.keys(pattern)
+
+            total_keys = len(keys)
+            total_memory = 0
+
             for key in keys:
-                # Check if key belongs to tenant
-                cached_data = self.redis.get(key)
-                if cached_data:
-                    data = json.loads(cached_data)
-                    if data.get("tenant_id") == tenant_id:
-                        self.redis.delete(key)
-        except (json.JSONDecodeError, redis.RedisError):
-            pass
+                try:
+                    memory = self.redis.memory_usage(key)
+                    if memory:
+                        total_memory += memory
+                except:
+                    pass
+
+            return {
+                "tenant_id": tenant_id,
+                "total_keys": total_keys,
+                "total_memory_bytes": total_memory,
+                "redis_connected": True,
+            }
+
+        except Exception as e:
+            logger.error(f"Failed to get cache stats: {e}")
+            return {"error": str(e)}

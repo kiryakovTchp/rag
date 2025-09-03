@@ -1,6 +1,5 @@
 """PostgreSQL pgvector index backend."""
 
-import json
 import os
 from typing import List, Tuple
 
@@ -24,15 +23,19 @@ class PGVectorIndex:
         """Ensure pgvector extension is enabled."""
         try:
             from db.session import engine
+
             with engine.connect() as conn:
                 conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
                 conn.commit()
         except Exception as e:
             import logging
+
             logger = logging.getLogger(__name__)
             logger.warning(f"Could not ensure pgvector extension: {e}")
 
-    def upsert_embeddings(self, chunk_ids: List[int], vectors: np.ndarray, provider: str):
+    def upsert_embeddings(
+        self, chunk_ids: List[int], vectors: np.ndarray, provider: str
+    ):
         """Upsert embeddings for chunks.
 
         Args:
@@ -48,6 +51,7 @@ class PGVectorIndex:
 
         try:
             from db.session import SessionLocal
+
             db = SessionLocal()
             try:
                 # Use raw SQL for efficient upsert
@@ -77,11 +81,14 @@ class PGVectorIndex:
                 db.close()
         except Exception as e:
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to upsert embeddings: {e}")
             raise
 
-    def search(self, query_vector: np.ndarray, top_k: int = 100) -> List[Tuple[int, float]]:
+    def search(
+        self, query_vector: np.ndarray, top_k: int = 100
+    ) -> List[Tuple[int, float]]:
         """Search for similar chunks.
 
         Args:
@@ -91,7 +98,6 @@ class PGVectorIndex:
         Returns:
             List of (chunk_id, score) tuples sorted by score DESC
         """
-        import os
 
         # Ensure query vector is float32
         query_vector = query_vector.astype(np.float32)
@@ -111,13 +117,16 @@ class PGVectorIndex:
 
         try:
             from db.session import engine
+
             with engine.connect() as conn:
                 result = conn.execute(
-                    text(sql), {"query_vector": query_vector, "top_k": top_k, "probes": probes}
+                    text(sql),
+                    {"query_vector": query_vector, "top_k": top_k, "probes": probes},
                 )
                 return [(row[0], row[1]) for row in result]
         except Exception as e:
             import logging
+
             logger = logging.getLogger(__name__)
             logger.error(f"Failed to search embeddings: {e}")
             return []

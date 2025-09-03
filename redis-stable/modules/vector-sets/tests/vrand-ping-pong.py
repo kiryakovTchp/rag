@@ -1,5 +1,4 @@
 from test import TestCase, generate_random_vector
-import struct
 
 
 class VRANDMEMBERPingPongRegressionTest(TestCase):
@@ -17,11 +16,15 @@ class VRANDMEMBERPingPongRegressionTest(TestCase):
         # Add exactly two vectors
         vec1_name = "vec1"
         vec1_data = generate_random_vector(dim)
-        self.redis.execute_command("VADD", self.test_key, "VALUES", dim, *vec1_data, vec1_name)
+        self.redis.execute_command(
+            "VADD", self.test_key, "VALUES", dim, *vec1_data, vec1_name
+        )
 
         vec2_name = "vec2"
         vec2_data = generate_random_vector(dim)
-        self.redis.execute_command("VADD", self.test_key, "VALUES", dim, *vec2_data, vec2_name)
+        self.redis.execute_command(
+            "VADD", self.test_key, "VALUES", dim, *vec2_data, vec2_name
+        )
 
         # Call VRANDMEMBER many times and check for distribution
         iterations = 100

@@ -1,189 +1,169 @@
-"""WebSocket endpoints for realtime job status via Redis Pub/Sub."""
+"""WebSocket endpoint for real-time communication."""
 
-import asyncio
 import json
 import logging
-from datetime import datetime
-from typing import Dict, List
+from typing import Any
+
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
+from fastapi.responses import HTMLResponse
 
 from api.auth import get_current_user_ws
-from services.events.bus import subscribe_loop
-
-router = APIRouter()
+from services.events.bus import publish_event
 
 logger = logging.getLogger(__name__)
+router = APIRouter()
 
 
 class ConnectionManager:
-    """Manage WebSocket connections with Redis Pub/Sub integration."""
+    """Manage WebSocket connections."""
 
     def __init__(self):
-        self.active_connections: Dict[str, List[WebSocket]] = {}
-        self._subscription_tasks: Dict[str, asyncio.Task] = {}
+        self.active_connections: list[WebSocket] = []
 
-    async def connect(self, websocket: WebSocket, tenant_id: str):
-        """Connect a new WebSocket client and subscribe to Redis channel."""
+    async def connect(self, websocket: WebSocket):
+        """Accept new WebSocket connection."""
         await websocket.accept()
-        if tenant_id not in self.active_connections:
-            self.active_connections[tenant_id] = []
-            # Start Redis subscription for this tenant
-            try:
-                await self._start_subscription(tenant_id)
-            except Exception as e:
-                logger.error(f"Failed to connect WebSocket for tenant {tenant_id}: {e}")
-                await websocket.close(code=4000, reason="Redis connection failed")
-                raise
-        
-        self.active_connections[tenant_id].append(websocket)
-        logger.info(f"WebSocket connected for tenant {tenant_id}")
+        self.active_connections.append(websocket)
+        logger.info(
+            f"WebSocket connected. Total connections: {len(self.active_connections)}"
+        )
 
-    def disconnect(self, websocket: WebSocket, tenant_id: str):
-        """Disconnect a WebSocket client."""
-        if tenant_id in self.active_connections:
-            self.active_connections[tenant_id].remove(websocket)
-            if not self.active_connections[tenant_id]:
-                del self.active_connections[tenant_id]
-                # Stop Redis subscription for this tenant
-                self._stop_subscription(tenant_id)
-                logger.info(f"WebSocket disconnected for tenant {tenant_id}")
+    def disconnect(self, websocket: WebSocket):
+        """Remove WebSocket connection."""
+        if websocket in self.active_connections:
+            self.active_connections.remove(websocket)
+        logger.info(
+            f"WebSocket disconnected. Total connections: {len(self.active_connections)}"
+        )
 
-    async def _start_subscription(self, tenant_id: str):
-        """Start Redis subscription for tenant."""
-        if tenant_id in self._subscription_tasks:
-            return
-        
-        topic = f"{tenant_id}.jobs"
+    async def send_personal_message(
+        self, message: dict[str, Any], websocket: WebSocket
+    ):
+        """Send message to specific WebSocket connection."""
         try:
-            task = asyncio.create_task(subscribe_loop(topic, self._handle_redis_message))
-            self._subscription_tasks[tenant_id] = task
-            logger.info(f"Started Redis subscription for {topic}")
+            await websocket.send_text(json.dumps(message))
         except Exception as e:
-            logger.error(f"Failed to start Redis subscription for {topic}: {e}")
-            # Close WebSocket connection with error code
-            if tenant_id in self.active_connections:
-                for connection in self.active_connections[tenant_id]:
-                    try:
-                        await connection.close(code=4000, reason="Redis connection failed")
-                    except Exception:
-                        pass
-            raise
+            logger.error(f"Failed to send message: {e}")
+            self.disconnect(websocket)
 
-    def _stop_subscription(self, tenant_id: str):
-        """Stop Redis subscription for tenant."""
-        if tenant_id in self._subscription_tasks:
-            task = self._subscription_tasks[tenant_id]
-            if not task.done():
-                task.cancel()
-            del self._subscription_tasks[tenant_id]
+    async def broadcast(self, message: dict[str, Any]):
+        """Broadcast message to all active connections."""
+        disconnected = []
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(json.dumps(message))
+            except Exception as e:
+                logger.error(f"Failed to broadcast message: {e}")
+                disconnected.append(connection)
 
-    async def _handle_redis_message(self, message: dict):
-        """Handle message from Redis and relay to WebSocket clients."""
-        # Extract tenant_id from topic (assuming message contains it)
-        tenant_id = message.get("tenant_id")
-        if not tenant_id:
-            logger.warning("Message missing tenant_id, cannot relay")
-            return
-
-        if tenant_id in self.active_connections:
-            dead_connections = []
-            for connection in self.active_connections[tenant_id]:
-                try:
-                    await connection.send_text(json.dumps(message))
-                except Exception as e:
-                    logger.warning(f"Failed to send to WebSocket: {e}")
-                    dead_connections.append(connection)
-
-            # Clean up dead connections
-            for dead_connection in dead_connections:
-                self.disconnect(dead_connection, tenant_id)
-
-    async def send_personal_message(self, message: dict, tenant_id: str):
-        """Send message to all connections of a tenant."""
-        if tenant_id in self.active_connections:
-            dead_connections = []
-            for connection in self.active_connections[tenant_id]:
-                try:
-                    await connection.send_text(json.dumps(message))
-                except Exception as e:
-                    logger.warning(f"Failed to send personal message: {e}")
-                    dead_connections.append(connection)
-
-            # Clean up dead connections
-            for dead_connection in dead_connections:
-                self.disconnect(dead_connection, tenant_id)
-
-    async def close_all(self):
-        """Close all connections and subscriptions."""
-        for tenant_id in list(self.active_connections.keys()):
-            for connection in self.active_connections[tenant_id]:
-                try:
-                    await connection.close(code=1000, reason="Server shutdown")
-                except Exception:
-                    pass
-            self._stop_subscription(tenant_id)
-        self.active_connections.clear()
+        # Remove disconnected connections
+        for connection in disconnected:
+            self.disconnect(connection)
 
 
 manager = ConnectionManager()
 
 
-@router.websocket("/ws/jobs")
+@router.get("/")
+async def get():
+    """WebSocket test page."""
+    html = """
+    <!DOCTYPE html>
+    <html>
+        <head>
+            <title>WebSocket Test</title>
+        </head>
+        <body>
+            <h1>WebSocket Test</h1>
+            <div id="messages"></div>
+            <input type="text" id="messageText" placeholder="Type a message...">
+            <button onclick="sendMessage()">Send</button>
+            <script>
+                var ws = new WebSocket("ws://localhost:8000/ws");
+                ws.onmessage = function(event) {
+                    var messages = document.getElementById('messages');
+                    var message = document.createElement('div');
+                    message.textContent = event.data;
+                    messages.appendChild(message);
+                };
+                function sendMessage() {
+                    var input = document.getElementById("messageText");
+                    ws.send(input.value);
+                    input.value = '';
+                }
+            </script>
+        </body>
+    </html>
+    """
+    return HTMLResponse(html)
+
+
+@router.websocket("/ws")
 async def websocket_endpoint(websocket: WebSocket):
-    """WebSocket endpoint for job status updates via Redis Pub/Sub."""
+    """WebSocket endpoint for real-time communication."""
+    await manager.connect(websocket)
+
     try:
-        # Get user from WebSocket
+        # Authenticate user
         user = await get_current_user_ws(websocket)
         if not user:
-            await websocket.close(code=4001, reason="Unauthorized")
+            await websocket.send_text(json.dumps({"error": "Authentication required"}))
             return
 
-        tenant_id = user.get("tenant_id")
-        if not tenant_id:
-            await websocket.close(code=4002, reason="No tenant ID")
-            return
+        # Subscribe to user's events
+        tenant_id = user.get("tenant_id", "unknown")
+        user_id = user.get("user_id", "unknown")
 
-        await manager.connect(websocket, tenant_id)
+        logger.info(f"User {user_id} connected to WebSocket for tenant {tenant_id}")
 
-        try:
-            # Send connection confirmation
-            await websocket.send_text(
-                json.dumps(
-                    {
-                        "event": "connected",
-                        "tenant_id": tenant_id,
-                        "ts": datetime.utcnow().isoformat() + "Z",
-                    }
-                )
-            )
+        # Send welcome message
+        await manager.send_personal_message(
+            {"type": "connected", "user_id": user_id, "tenant_id": tenant_id}, websocket
+        )
 
-            # Keep connection alive with ping/pong
-            while True:
-                try:
-                    data = await websocket.receive_text()
-                    message = json.loads(data)
+        # Handle incoming messages
+        while True:
+            try:
+                data = await websocket.receive_text()
+                message = json.loads(data)
 
-                    # Handle ping
-                    if message.get("type") == "ping":
-                        await websocket.send_text(
-                            json.dumps({"type": "pong", "ts": datetime.utcnow().isoformat() + "Z"})
-                        )
+                # Handle different message types
+                if message.get("type") == "subscribe":
+                    # Subscribe to specific events
+                    topic = message.get("topic", f"tenant.{tenant_id}")
+                    await websocket.send_text(
+                        json.dumps({"type": "subscribed", "topic": topic})
+                    )
 
-                except WebSocketDisconnect:
-                    break
-                except json.JSONDecodeError:
-                    # Ignore invalid JSON
-                    continue
+                elif message.get("type") == "ping":
+                    # Respond to ping
+                    await websocket.send_text(json.dumps({"type": "pong"}))
 
-        except WebSocketDisconnect:
-            logger.info(f"WebSocket disconnected for tenant {tenant_id}")
-        finally:
-            manager.disconnect(websocket, tenant_id)
+                else:
+                    # Echo back unknown messages
+                    await websocket.send_text(
+                        json.dumps({"type": "echo", "data": message})
+                    )
 
+            except json.JSONDecodeError:
+                await websocket.send_text(json.dumps({"error": "Invalid JSON"}))
+            except Exception as e:
+                logger.error(f"WebSocket error: {e}")
+                await websocket.send_text(json.dumps({"error": "Internal error"}))
+
+    except WebSocketDisconnect:
+        manager.disconnect(websocket)
     except Exception as e:
-        logger.error(f"WebSocket error: {e}")
-        await websocket.close(code=4000, reason=str(e))
+        logger.error(f"WebSocket connection error: {e}")
+        manager.disconnect(websocket)
 
 
-# Export for use in API
-__all__ = ["manager"]
+@router.post("/publish/{topic}")
+async def publish_message(topic: str, message: dict[str, Any]):
+    """Publish message to topic."""
+    try:
+        await publish_event(topic, message)
+        return {"status": "published", "topic": topic}
+    except Exception as e:
+        logger.error(f"Failed to publish message: {e}")
+        return {"error": "Failed to publish message"}

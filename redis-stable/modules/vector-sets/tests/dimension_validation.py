@@ -1,5 +1,6 @@
-from test import TestCase, generate_random_vector
 import struct
+from test import TestCase, generate_random_vector
+
 import redis.exceptions
 
 
@@ -38,7 +39,9 @@ class DimensionValidation(TestCase):
         assert (
             info_map["vector-dim"] == reduced_dim
         ), f"Expected reduced dimension {reduced_dim}, got {info['vector-dim']}"
-        assert "projection-input-dim" in info_map, "VINFO should contain projection-input-dim"
+        assert (
+            "projection-input-dim" in info_map
+        ), "VINFO should contain projection-input-dim"
         assert (
             info_map["projection-input-dim"] == original_dim
         ), f"Expected original dimension {original_dim}, got {info['projection-input-dim']}"

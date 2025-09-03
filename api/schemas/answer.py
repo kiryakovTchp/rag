@@ -1,60 +1,48 @@
-"""Answer API schemas."""
+"""Answer generation schemas."""
 
-from typing import List, Optional
-from pydantic import BaseModel, Field
+from typing import Optional
+
+from pydantic import BaseModel
+
+
+class AnswerRequest(BaseModel):
+    """Request for answer generation."""
+
+    query: str
+    top_k: int = 10
+    rerank: bool = False
+    max_ctx: int = 4000
+    model: str = "gemini-pro"
+    temperature: float = 0.7
+    max_tokens: int = 1000
+    timeout_s: int = 60
 
 
 class Citation(BaseModel):
     """Citation information."""
-    
+
     doc_id: int
     chunk_id: int
     page: Optional[int] = None
     score: float
+    snippet: str
+    breadcrumbs: list[str] = []
 
 
-class Usage(BaseModel):
-    """Usage information."""
-    
+class UsageInfo(BaseModel):
+    """Usage information for answer generation."""
+
+    provider: Optional[str] = None
+    model: Optional[str] = None
     in_tokens: Optional[int] = None
     out_tokens: Optional[int] = None
-    latency_ms: int
-    provider: str
-    model: str
+    latency_ms: Optional[int] = None
     cost_usd: Optional[float] = None
 
 
-class AnswerRequest(BaseModel):
-    """Answer generation request."""
-    
-    query: str = Field(..., min_length=1, max_length=1000)
-    top_k: int = Field(default=10, ge=1, le=50)
-    rerank: bool = Field(default=False)
-    max_ctx: int = Field(default=2000, ge=100, le=4096)
-    model: Optional[str] = Field(default=None, max_length=100)
-    temperature: float = Field(default=0.2, ge=0.0, le=1.0)
-    max_tokens: int = Field(default=1024, ge=1, le=4096)
-    timeout_s: int = Field(default=30, ge=1, le=120)
-
-
 class AnswerResponse(BaseModel):
-    """Answer generation response."""
-    
+    """Response from answer generation."""
+
     answer: str
-    citations: List[Citation]
-    usage: Usage
-
-
-class StreamChunk(BaseModel):
-    """Streaming chunk response."""
-    
-    type: str = "chunk"
-    text: str
-
-
-class StreamDone(BaseModel):
-    """Streaming final response."""
-    
-    type: str = "done"
-    citations: List[Citation]
-    usage: Usage
+    citations: list[Citation] = []
+    usage: Optional[UsageInfo] = None

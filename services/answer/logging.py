@@ -1,6 +1,7 @@
 """Answer usage logging service."""
 
 from typing import Optional
+
 from sqlalchemy.orm import Session
 
 from db.models import AnswerLog
@@ -15,10 +16,10 @@ def log_answer_usage(
     in_tokens: Optional[int],
     out_tokens: Optional[int],
     latency_ms: int,
-    cost_usd: Optional[float]
+    cost_usd: Optional[float],
 ) -> None:
     """Log answer usage to database.
-    
+
     Args:
         db: Database session
         tenant_id: Tenant identifier
@@ -34,7 +35,7 @@ def log_answer_usage(
     cost_str = None
     if cost_usd is not None:
         cost_str = f"{cost_usd:.6f}"
-    
+
     # Create log entry
     log_entry = AnswerLog(
         tenant_id=tenant_id,
@@ -44,8 +45,8 @@ def log_answer_usage(
         in_tokens=in_tokens,
         out_tokens=out_tokens,
         latency_ms=latency_ms,
-        cost_usd=cost_str
+        cost_usd=cost_str,
     )
-    
+
     db.add(log_entry)
     db.commit()

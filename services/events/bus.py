@@ -1,12 +1,13 @@
 """Event Bus for Redis Pub/Sub communication between workers and API."""
 
-import json
 import asyncio
+import json
 import logging
-from typing import Callable, Dict, Any, Optional, Union
-from datetime import datetime, timezone
-import redis.asyncio as redis
 from contextlib import asynccontextmanager
+from datetime import datetime, timezone
+from typing import Any, Callable, Dict, Optional, Union
+
+import redis.asyncio as redis
 
 # Import metrics if available (API context)
 try:
@@ -15,6 +16,7 @@ except ImportError:
     # Workers context - use dummy function
     def record_redis_failure(tenant: str, topic: str):
         pass
+
 
 logger = logging.getLogger(__name__)
 
@@ -72,7 +74,9 @@ class EventBus:
             record_redis_failure(tenant_id, topic)
             return False
 
-    async def subscribe_loop(self, topic: str, handler: Callable[[Dict[str, Any]], None]) -> None:
+    async def subscribe_loop(
+        self, topic: str, handler: Callable[[Dict[str, Any]], None]
+    ) -> None:
         """Subscribe to Redis channel and process messages in loop.
 
         Args:
@@ -135,7 +139,7 @@ async def publish_event(topic: str, payload: Dict[str, Any]) -> bool:
 
 def publish_event_sync(topic: str, payload: Dict[str, Any]) -> bool:
     """Synchronous version of publish_event for use in Celery tasks.
-    
+
     Note: Celery tasks run outside an event loop, so we need to create one.
     """
     try:

@@ -1,60 +1,54 @@
 """Base LLM provider interface."""
 
 from abc import ABC, abstractmethod
-from typing import Iterator, List
+from collections.abc import Iterator
 
 
 class LLMProvider(ABC):
-    """Base interface for LLM providers."""
-    
+    """Base class for LLM providers."""
+
     @abstractmethod
     def generate(
-        self, 
-        messages: List[dict], 
-        model: str, 
-        max_tokens: int, 
-        temperature: float, 
-        timeout_s: int
+        self,
+        messages: list[dict],
+        model: str,
+        max_tokens: int,
+        temperature: float = 0.7,
+        timeout_s: int = 60,
     ) -> tuple[str, dict]:
-        """Generate a single response.
-        
+        """Generate text from messages.
+
         Args:
-            messages: List of message dicts with "role" and "content"
+            messages: List of message dictionaries
             model: Model name to use
             max_tokens: Maximum tokens to generate
-            temperature: Sampling temperature (0.0-1.0)
+            temperature: Sampling temperature
             timeout_s: Timeout in seconds
-            
+
         Returns:
-            Tuple of (response_text, usage_dict)
-            
-        Raises:
-            Exception: If generation fails
+            Tuple of (generated_text, usage_info)
         """
         pass
-    
+
     @abstractmethod
     def stream(
-        self, 
-        messages: List[dict], 
-        model: str, 
-        max_tokens: int, 
-        temperature: float, 
-        timeout_s: int
-    ) -> Iterator[str]:
-        """Generate streaming response.
-        
+        self,
+        messages: list[dict],
+        model: str,
+        max_tokens: int,
+        temperature: float = 0.7,
+        timeout_s: int = 60,
+    ) -> Iterator[dict]:
+        """Stream text generation from messages.
+
         Args:
-            messages: List of message dicts with "role" and "content"
+            messages: List of message dictionaries
             model: Model name to use
             max_tokens: Maximum tokens to generate
-            temperature: Sampling temperature (0.0-1.0)
+            temperature: Sampling temperature
             timeout_s: Timeout in seconds
-            
-        Yields:
-            Text chunks as they arrive
-            
-        Raises:
-            Exception: If generation fails
+
+        Returns:
+            Iterator of response chunks
         """
         pass

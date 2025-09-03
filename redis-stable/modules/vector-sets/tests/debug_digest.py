@@ -1,5 +1,5 @@
-from test import TestCase, generate_random_vector
 import struct
+from test import TestCase, generate_random_vector
 
 
 class DebugDigestTest(TestCase):
@@ -41,16 +41,22 @@ class DebugDigestTest(TestCase):
             assert (
                 digest2 is not None
             ), "DEBUG DIGEST-VALUE should return a value after attribute change"
-            assert digest1 != digest2, "Digest should change when an attribute is modified"
+            assert (
+                digest1 != digest2
+            ), "Digest should change when an attribute is modified"
 
             # Remove attribute and verify digest changes again
-            self.redis.execute_command("VSETATTR", self.test_key, f"{self.test_key}:item:2", "")
+            self.redis.execute_command(
+                "VSETATTR", self.test_key, f"{self.test_key}:item:2", ""
+            )
 
             digest3 = self.redis.execute_command("DEBUG", "DIGEST-VALUE", self.test_key)
             assert (
                 digest3 is not None
             ), "DEBUG DIGEST-VALUE should return a value after attribute removal"
-            assert digest2 != digest3, "Digest should change when an attribute is removed"
+            assert (
+                digest2 != digest3
+            ), "Digest should change when an attribute is removed"
 
         except Exception as e:
             raise AssertionError(f"DEBUG DIGEST-VALUE command failed: {str(e)}")

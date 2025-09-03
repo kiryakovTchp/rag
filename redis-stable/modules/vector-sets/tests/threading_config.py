@@ -1,5 +1,5 @@
-from test import TestCase, generate_random_vector
 import struct
+from test import TestCase, generate_random_vector
 
 
 class ThreadingConfigTest(TestCase):
@@ -57,15 +57,22 @@ class ThreadingConfigTest(TestCase):
         assert (
             initial_value is not None
         ), "Should be able to read vset-force-single-threaded-execution config"
-        assert initial_value in ["yes", "no"], f"Config value should be yes/no, got {initial_value}"
+        assert initial_value in [
+            "yes",
+            "no",
+        ], f"Config value should be yes/no, got {initial_value}"
 
         # Test mutability by toggling the value
         new_value = "no" if initial_value == "yes" else "yes"
-        assert self.set_config_value(new_value == "yes"), "Should be able to change config value"
+        assert self.set_config_value(
+            new_value == "yes"
+        ), "Should be able to change config value"
 
         # Verify the change
         current_value = self.get_config_value()
-        assert current_value == new_value, f"Config should be {new_value}, got {current_value}"
+        assert (
+            current_value == new_value
+        ), f"Config should be {new_value}, got {current_value}"
 
         # Restore original value
         assert self.set_config_value(
@@ -139,11 +146,19 @@ class ThreadingConfigTest(TestCase):
 
         # Test VSIM without NOTHREAD
         query_vec = generate_random_vector(dim)
-        args = ["VSIM", self.test_key, "VALUES", dim] + [str(x) for x in query_vec] + ["COUNT", 3]
+        args = (
+            ["VSIM", self.test_key, "VALUES", dim]
+            + [str(x) for x in query_vec]
+            + ["COUNT", 3]
+        )
         result = self.redis.execute_command(*args)
 
-        assert isinstance(result, list), f"VSIM should return a list, got {type(result)}"
-        assert len(result) <= 3, f"VSIM should return at most 3 results, got {len(result)}"
+        assert isinstance(
+            result, list
+        ), f"VSIM should return a list, got {type(result)}"
+        assert (
+            len(result) <= 3
+        ), f"VSIM should return at most 3 results, got {len(result)}"
 
     def test_vsim_with_nothread(self, force_single_threaded=False):
         """Test 5: VSIM command with NOTHREAD"""
@@ -160,7 +175,11 @@ class ThreadingConfigTest(TestCase):
                 vec = generate_random_vector(dim)
                 vec_bytes = struct.pack(f"{dim}f", *vec)
                 self.redis.execute_command(
-                    "VADD", self.test_key, "FP32", vec_bytes, f"{self.test_key}:item:{i}"
+                    "VADD",
+                    self.test_key,
+                    "FP32",
+                    vec_bytes,
+                    f"{self.test_key}:item:{i}",
                 )
 
         # Test VSIM with NOTHREAD
@@ -218,7 +237,11 @@ class ThreadingConfigTest(TestCase):
                 vec = generate_random_vector(dim)
                 vec_bytes = struct.pack(f"{dim}f", *vec)
                 self.redis.execute_command(
-                    "VADD", self.test_key, "FP32", vec_bytes, f"{self.test_key}:item:{i}"
+                    "VADD",
+                    self.test_key,
+                    "FP32",
+                    vec_bytes,
+                    f"{self.test_key}:item:{i}",
                 )
 
             # NOTHREAD should work regardless of config
@@ -275,14 +298,14 @@ class ThreadingConfigTest(TestCase):
 
     def _print_test_summary(self, initial_force_single):
         """Print a summary of what was tested"""
-        print(f"\nThreading Configuration Test Summary:")
-        print(f"  Configuration: vset-force-single-threaded-execution")
-        print(f"  Type: Boolean, Mutable")
+        print("\nThreading Configuration Test Summary:")
+        print("  Configuration: vset-force-single-threaded-execution")
+        print("  Type: Boolean, Mutable")
         print(f"  Initial value: {'yes' if initial_force_single else 'no'}")
-        print(f"  Tested modes: Both multi-threaded (no) and single-threaded (yes)")
-        print(f"  VADD: Works correctly in both modes")
-        print(f"  VADD with CAS: Works correctly in both modes")
-        print(f"  VSIM: Works correctly in both modes")
-        print(f"  NOTHREAD option: Overrides config in both modes")
-        print(f"  Configuration mutability: ✅ Successfully changed at runtime")
-        print(f"  All tests passed successfully!")
+        print("  Tested modes: Both multi-threaded (no) and single-threaded (yes)")
+        print("  VADD: Works correctly in both modes")
+        print("  VADD with CAS: Works correctly in both modes")
+        print("  VSIM: Works correctly in both modes")
+        print("  NOTHREAD option: Overrides config in both modes")
+        print("  Configuration mutability: ✅ Successfully changed at runtime")
+        print("  All tests passed successfully!")

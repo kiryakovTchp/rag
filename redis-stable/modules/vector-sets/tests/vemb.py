@@ -1,6 +1,6 @@
-from test import TestCase
-import struct
 import math
+import struct
+from test import TestCase
 
 
 class VEMB(TestCase):
@@ -23,12 +23,21 @@ class VEMB(TestCase):
 
         # Add using VALUES
         self.redis.execute_command(
-            "VADD", self.test_key, "VALUES", dim, *[str(x) for x in vec], f"{self.test_key}:item:2"
+            "VADD",
+            self.test_key,
+            "VALUES",
+            dim,
+            *[str(x) for x in vec],
+            f"{self.test_key}:item:2",
         )
 
         # Get both back with VEMB
-        result1 = self.redis.execute_command("VEMB", self.test_key, f"{self.test_key}:item:1")
-        result2 = self.redis.execute_command("VEMB", self.test_key, f"{self.test_key}:item:2")
+        result1 = self.redis.execute_command(
+            "VEMB", self.test_key, f"{self.test_key}:item:1"
+        )
+        result2 = self.redis.execute_command(
+            "VEMB", self.test_key, f"{self.test_key}:item:2"
+        )
 
         retrieved_vec1 = [float(x) for x in result1]
         retrieved_vec2 = [float(x) for x in result2]

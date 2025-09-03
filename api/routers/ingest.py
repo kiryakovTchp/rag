@@ -3,10 +3,9 @@ from typing import Optional
 from fastapi import APIRouter, Depends, File, Form, HTTPException, UploadFile
 from sqlalchemy.orm import Session
 
-from api.dependencies.db import get_db_lazy
 from api.auth import get_current_user_dict
-from api.middleware.rate_limit import check_quota
-from api.schemas.ingest import IngestResponse, JobStatusResponse, DocumentStatusResponse
+from api.dependencies.db import get_db_lazy
+from api.schemas.ingest import DocumentStatusResponse, IngestResponse, JobStatusResponse
 from services.ingest.service import IngestService
 
 router = APIRouter()
@@ -26,11 +25,11 @@ async def ingest_document(
     # Get user info
     user_tenant_id = user["tenant_id"]
     user_id = user["user_id"]
-    
+
     # Use user's tenant_id if not provided
     if not tenant_id:
         tenant_id = user_tenant_id
-    
+
     # Check quota (rate limiting is handled by middleware)
     # await check_quota(tenant_id, estimated_tokens)
     # Validate file type
@@ -54,11 +53,15 @@ async def ingest_document(
     service = IngestService(db)
     job_id = await service.ingest_document(file, tenant_id, safe_mode)
 
-    return IngestResponse(job_id=job_id, status="queued", message="Document uploaded successfully")
+    return IngestResponse(
+        job_id=job_id, status="queued", message="Document uploaded successfully"
+    )
 
 
 @router.get("/ingest/{job_id}", response_model=JobStatusResponse)
-async def get_job_status(job_id: int, db: Session = Depends(get_db_lazy)) -> JobStatusResponse:
+async def get_job_status(
+    job_id: int, db: Session = Depends(get_db_lazy)
+) -> JobStatusResponse:
     """Get job status by ID."""
     service = IngestService(db)
     job = service.get_job_status(job_id)
@@ -79,7 +82,9 @@ async def get_job_status(job_id: int, db: Session = Depends(get_db_lazy)) -> Job
 
 
 @router.get("/ingest/document/{document_id}", response_model=DocumentStatusResponse)
-async def get_document_status(document_id: int, db: Session = Depends(get_db_lazy)) -> DocumentStatusResponse:
+async def get_document_status(
+    document_id: int, db: Session = Depends(get_db_lazy)
+) -> DocumentStatusResponse:
     """Get document status with all jobs."""
     service = IngestService(db)
     document_status = service.get_document_status(document_id)

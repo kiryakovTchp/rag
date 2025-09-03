@@ -11,18 +11,19 @@
 # GNU Affero General Public License v3 (AGPLv3).
 #
 
-import redis
-import random
-import struct
-import math
-import time
-import sys
-import os
+import argparse
 import importlib
 import inspect
-import argparse
-from typing import List, Tuple, Optional
+import math
+import os
+import random
+import struct
+import sys
+import time
 from dataclasses import dataclass
+from typing import List, Optional, Tuple
+
+import redis
 
 
 def colored(text: str, color: str) -> str:
@@ -43,7 +44,9 @@ class VectorData:
     vectors: List[List[float]]
     names: List[str]
 
-    def find_k_nearest(self, query_vector: List[float], k: int) -> List[Tuple[str, float]]:
+    def find_k_nearest(
+        self, query_vector: List[float], k: int
+    ) -> List[Tuple[str, float]]:
         """Find k-nearest neighbors using the same scoring as Redis VSIM WITHSCORES."""
         similarities = []
         query_norm = math.sqrt(sum(x * x for x in query_vector))
@@ -195,7 +198,11 @@ def find_test_classes(primary_port, replica_port):
             try:
                 module = importlib.import_module(module_name)
                 for name, obj in inspect.getmembers(module):
-                    if inspect.isclass(obj) and obj.__name__ != "TestCase" and hasattr(obj, "test"):
+                    if (
+                        inspect.isclass(obj)
+                        and obj.__name__ != "TestCase"
+                        and hasattr(obj, "test")
+                    ):
                         # Create test instance with specified ports
                         test_instance = obj(primary_port, replica_port)
                         test_classes.append(test_instance)
@@ -224,7 +231,9 @@ def check_redis_empty(r, instance_name):
             )
             sys.exit(1)
     except redis.exceptions.ConnectionError:
-        print(colored(f"ERROR: Cannot connect to {instance_name} Redis instance.", "red"))
+        print(
+            colored(f"ERROR: Cannot connect to {instance_name} Redis instance.", "red")
+        )
         sys.exit(1)
 
 
@@ -237,7 +246,8 @@ def check_replica_running(replica_port):
     except redis.exceptions.ConnectionError:
         print(
             colored(
-                f"WARNING: Replica Redis instance (port {replica_port}) is not running.", "yellow"
+                f"WARNING: Replica Redis instance (port {replica_port}) is not running.",
+                "yellow",
             )
         )
         print(
@@ -253,15 +263,21 @@ def run_tests():
     # Parse command line arguments
     parser = argparse.ArgumentParser(description="Run Redis vector tests.")
     parser.add_argument(
-        "--primary-port", type=int, default=6379, help="Primary Redis instance port (default: 6379)"
+        "--primary-port",
+        type=int,
+        default=6379,
+        help="Primary Redis instance port (default: 6379)",
     )
     parser.add_argument(
-        "--replica-port", type=int, default=6380, help="Replica Redis instance port (default: 6380)"
+        "--replica-port",
+        type=int,
+        default=6380,
+        help="Replica Redis instance port (default: 6380)",
     )
     args = parser.parse_args()
 
     print("================================================")
-    print(f"Make sure to have Redis running on localhost")
+    print("Make sure to have Redis running on localhost")
     print(f"Primary port: {args.primary_port}")
     print(f"Replica port: {args.replica_port}")
     print("with --enable-debug-command yes")

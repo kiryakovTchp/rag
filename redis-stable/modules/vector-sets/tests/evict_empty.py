@@ -1,5 +1,5 @@
-from test import TestCase, generate_random_vector
 import struct
+from test import TestCase, generate_random_vector
 
 
 class VREM_LastItemDeletesKey(TestCase):
@@ -22,7 +22,9 @@ class VREM_LastItemDeletesKey(TestCase):
         assert exists == 1, "Key should exist after VADD"
 
         # Remove the item
-        result = self.redis.execute_command("VREM", self.test_key, f"{self.test_key}:item:1")
+        result = self.redis.execute_command(
+            "VREM", self.test_key, f"{self.test_key}:item:1"
+        )
         assert result == 1, "VREM should return 1 for successful removal"
 
         # Verify the key no longer exists

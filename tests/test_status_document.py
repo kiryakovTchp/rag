@@ -1,7 +1,7 @@
 """Test document status endpoint."""
 
-import time
 import unittest
+
 from fastapi.testclient import TestClient
 
 from api.main import app
@@ -28,33 +28,24 @@ class TestDocumentStatus(unittest.TestCase):
             name="test_doc.pdf",
             mime="application/pdf",
             storage_uri="s3://test/test.pdf",
-            status="uploaded"
+            status="uploaded",
         )
         self.db.add(document)
         self.db.flush()
 
         # Create jobs in chronological order
         parse_job = Job(
-            type="parse",
-            status="done",
-            progress=100,
-            document_id=document.id
+            type="parse", status="done", progress=100, document_id=document.id
         )
         self.db.add(parse_job)
 
         chunk_job = Job(
-            type="chunk",
-            status="done",
-            progress=100,
-            document_id=document.id
+            type="chunk", status="done", progress=100, document_id=document.id
         )
         self.db.add(chunk_job)
 
         embed_job = Job(
-            type="embed",
-            status="done",
-            progress=100,
-            document_id=document.id
+            type="embed", status="done", progress=100, document_id=document.id
         )
         self.db.add(embed_job)
 
@@ -95,33 +86,24 @@ class TestDocumentStatus(unittest.TestCase):
             name="test_doc.pdf",
             mime="application/pdf",
             storage_uri="s3://test/test.pdf",
-            status="uploaded"
+            status="uploaded",
         )
         self.db.add(document)
         self.db.flush()
 
         # Create jobs with different timestamps
         parse_job = Job(
-            type="parse",
-            status="done",
-            progress=100,
-            document_id=document.id
+            type="parse", status="done", progress=100, document_id=document.id
         )
         self.db.add(parse_job)
 
         chunk_job = Job(
-            type="chunk",
-            status="done",
-            progress=100,
-            document_id=document.id
+            type="chunk", status="done", progress=100, document_id=document.id
         )
         self.db.add(chunk_job)
 
         embed_job = Job(
-            type="embed",
-            status="done",
-            progress=100,
-            document_id=document.id
+            type="embed", status="done", progress=100, document_id=document.id
         )
         self.db.add(embed_job)
 

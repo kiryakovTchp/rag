@@ -3,7 +3,6 @@
 Скрипт для создания PDF с таблицей для тестирования.
 """
 
-import os
 from pathlib import Path
 
 
