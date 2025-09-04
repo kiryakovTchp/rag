@@ -10,7 +10,6 @@ services:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
-      - ./db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-rag_user} -d ${POSTGRES_DB:-rag_db}"]
       interval: 5s
@@ -38,11 +37,23 @@ services:
     environment:
       - DATABASE_URL=postgresql://rag_user:rag_password@db:5432/rag_db
       - REDIS_URL=redis://redis:6379
+      - EMBED_PROVIDER=${EMBED_PROVIDER:-ollama}
+      - RERANK_ENABLED=${RERANK_ENABLED:-false}
+      - S3_ENDPOINT=${S3_ENDPOINT:-http://minio:9000}
+      - S3_BUCKET=${S3_BUCKET:-promoai}
+      - OLLAMA_HOST=${OLLAMA_HOST}
       - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - SESSION_SECRET=${SESSION_SECRET}
       - GOOGLE_CLIENT_ID=${GOOGLE_CLIENT_ID}
       - GOOGLE_CLIENT_SECRET=${GOOGLE_CLIENT_SECRET}
+      - GOOGLE_REDIRECT_URI=${GOOGLE_REDIRECT_URI}
       - GOOGLE_API_KEY=${GOOGLE_API_KEY}
       - CORS_ORIGINS=${CORS_ORIGINS}
+      - WORKERS_AI_TOKEN=${WORKERS_AI_TOKEN}
+      - WORKERS_AI_URL=${WORKERS_AI_URL}
+      - WORKERS_AI_RERANK_URL=${WORKERS_AI_RERANK_URL}
+      - WORKERS_AI_API_KEY=${WORKERS_AI_API_KEY}
+      - OLLAMA_HOST=${OLLAMA_HOST}
     volumes:
       - ./api:/app/api
       - ./services:/app/services
@@ -52,8 +63,9 @@ services:
         condition: service_healthy
       redis:
         condition: service_healthy
+    command: bash -c "alembic -c /app/alembic.ini upgrade head && uvicorn api.main:app --host 0.0.0.0 --port 8000"
     healthcheck:
-      test: ["CMD-SHELL", "python - <<'PY'\nimport sys,urllib.request\ntry:\n  urllib.request.urlopen('http://127.0.0.1:8000/health', timeout=3)\n  sys.exit(0)\nexcept Exception as e:\n  print(e); sys.exit(1)\nPY"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8000/health || exit 1"]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -69,12 +81,17 @@ services:
       - REDIS_URL=${REDIS_URL}
       - CELERY_BROKER_URL=${REDIS_URL}/0
       - CELERY_RESULT_BACKEND=${REDIS_URL}/0
-      - EMBED_PROVIDER=${EMBED_PROVIDER:-workers_ai}
+      - EMBED_PROVIDER=${EMBED_PROVIDER:-ollama}
       - EMBED_PROVIDER_FALLBACK=${EMBED_PROVIDER_FALLBACK:-true}
+      - S3_ENDPOINT=${S3_ENDPOINT:-http://minio:9000}
+      - S3_BUCKET=${S3_BUCKET:-promoai}
+      - OLLAMA_HOST=${OLLAMA_HOST}
     volumes:
       - ./services:/app/services
       - ./workers:/app/workers
     depends_on:
+      ollama:
+        condition: service_started
       db:
         condition: service_healthy
       redis:
@@ -93,12 +110,32 @@ services:
       - VITE_WS_URL=${VITE_WS_URL}
       - VITE_AUTH_ENABLED=${VITE_AUTH_ENABLED}
       - VITE_GOOGLE_CLIENT_ID=${VITE_GOOGLE_CLIENT_ID}
-    volumes:
-      - ./web:/app
-      - /app/node_modules
+    volumes: []
     depends_on:
       api:
         condition: service_healthy
+
+  # MinIO (S3-compatible storage) for dev
+  minio:
+    image: minio/minio
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio:/data
+
+  # Ollama LLM/Embeddings server (optional, for local use)
+  ollama:
+    image: ollama/ollama:latest
+    ports:
+      - "11434:11434"
+    volumes:
+      - ollama:/root/.ollama
+    restart: unless-stopped
 
   # Prometheus для метрик
   prometheus:
@@ -134,3 +171,4 @@ volumes:
   redis_data:
   prometheus_data:
   grafana_data:
+  minio:

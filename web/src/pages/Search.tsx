@@ -45,7 +45,7 @@ export function SearchPage() {
       setSearchPerformed(true)
       
       const searchQuery: SearchQuery = {
-        question: query.trim(),
+        query: query.trim(),
         top_k: topK,
         rerank,
         bm25,

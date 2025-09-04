@@ -119,6 +119,7 @@ def parse_document(self, document_id: int, tenant_id: Optional[str] = None) -> d
             for element_data in elements:
                 element = Element(
                     document_id=document_id,
+                    tenant_id=tenant_id,
                     type=element_data["type"],
                     page=element_data.get("page"),
                     bbox=element_data.get("bbox"),

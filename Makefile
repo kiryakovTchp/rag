@@ -84,7 +84,7 @@ health: ## Проверить здоровье сервисов
 
 db-shell: ## Подключиться к базе данных
 	@echo "$(BLUE)🗄️ Подключение к базе данных...$(NC)"
-	docker-compose exec postgres psql -U rag_user -d rag_db
+	docker-compose exec db psql -U rag_user -d rag_db
 
 redis-cli: ## Подключиться к Redis CLI
 	@echo "$(BLUE)🔴 Подключение к Redis CLI...$(NC)"

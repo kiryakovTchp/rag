@@ -58,6 +58,15 @@ logs/
 .gradio/
 *.log
 reports/
+reports/
+node_modules/
+__pycache__/
+dump.rdb
+test.db
+web/dist/
+redis-stable/
+redis-stable.tar.gz
+*.dmg
 
 # Docker
 .dockerignore

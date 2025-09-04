@@ -5,6 +5,8 @@ const apiClient = axios.create({
   headers: {
     "Content-Type": "application/json",
   },
+  // Avoid hanging requests
+  timeout: 10000,
 });
 
 apiClient.interceptors.request.use((config) => {

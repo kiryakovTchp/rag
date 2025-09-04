@@ -54,15 +54,25 @@ class PGVectorIndex:
 
             db = SessionLocal()
             try:
-                # Use raw SQL for efficient upsert
+                # Prefetch tenant_id per chunk
+                try:
+                    tenant_rows = db.execute(
+                        text("SELECT id, tenant_id FROM chunks WHERE id = ANY(:ids)"),
+                        {"ids": chunk_ids},
+                    ).fetchall()
+                    tenant_map = {row[0]: row[1] for row in tenant_rows}
+                except Exception:
+                    tenant_map = {}
+
+                # Use raw SQL for efficient upsert (tenant-aware)
                 sql = """
-                INSERT INTO embeddings (chunk_id, vector, provider, created_at)
-                VALUES (:chunk_id, :vector, :provider, NOW())
-                ON CONFLICT (chunk_id) 
-                DO UPDATE SET 
+                INSERT INTO embeddings (chunk_id, tenant_id, vector, provider, created_at)
+                VALUES (:chunk_id, :tenant_id, :vector, :provider, NOW())
+                ON CONFLICT (chunk_id)
+                DO UPDATE SET
+                    tenant_id = EXCLUDED.tenant_id,
                     vector = EXCLUDED.vector,
-                    provider = EXCLUDED.provider,
-                    updated_at = NOW()
+                    provider = EXCLUDED.provider
                 """
 
                 for chunk_id, vector in zip(chunk_ids, vectors):
@@ -71,6 +81,7 @@ class PGVectorIndex:
                         text(sql),
                         {
                             "chunk_id": chunk_id,
+                            "tenant_id": tenant_map.get(chunk_id),
                             "vector": vector,  # numpy array passed directly
                             "provider": provider,
                         },

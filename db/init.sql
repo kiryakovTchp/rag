@@ -1,4 +1,8 @@
 -- Инициализация базы данных PromoAI RAG
+--
+-- ВНИМАНИЕ: этот файл устарел. Актуальная схема управляется Alembic миграциями
+-- из каталога db/migrations. Для продакшен/дев окружений используйте
+-- `alembic upgrade head` вместо монтирования init.sql.
 
 -- Создаем расширение pgvector если его нет
 CREATE EXTENSION IF NOT EXISTS vector;
@@ -37,7 +41,8 @@ CREATE TABLE IF NOT EXISTS document_chunks (
     embedding vector(1536), -- для OpenAI embeddings
     chunk_index INTEGER,
     metadata JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    acl_principals TEXT[]
 );
 
 -- Создаем таблицу задач
@@ -84,6 +89,62 @@ CREATE INDEX IF NOT EXISTS idx_document_chunks_embedding
 ON app.document_chunks 
 USING ivfflat (embedding vector_cosine_ops)
 WITH (lists = 100);
+
+-- GIN index for ACL principals search
+CREATE INDEX IF NOT EXISTS idx_document_chunks_acl_principals
+ON app.document_chunks USING GIN (acl_principals);
+
+-- OAuth tables for connectors
+CREATE TABLE IF NOT EXISTS oauth_accounts (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES app.users(id) ON DELETE CASCADE,
+    tenant_id VARCHAR(100),
+    provider VARCHAR(50) NOT NULL,
+    account_id VARCHAR(255) NOT NULL,
+    scopes TEXT[],
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE UNIQUE INDEX IF NOT EXISTS ix_oauth_accounts_provider_account
+    ON app.oauth_accounts(provider, account_id);
+CREATE INDEX IF NOT EXISTS ix_oauth_accounts_tenant ON app.oauth_accounts(tenant_id);
+
+CREATE TABLE IF NOT EXISTS oauth_tokens (
+    id SERIAL PRIMARY KEY,
+    account_id INTEGER NOT NULL REFERENCES app.oauth_accounts(id) ON DELETE CASCADE,
+    tenant_id VARCHAR(100),
+    access_token_encrypted TEXT NOT NULL,
+    refresh_token_encrypted TEXT,
+    expires_at TIMESTAMPTZ,
+    revoked_at TIMESTAMPTZ,
+    created_at TIMESTAMPTZ DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS ix_oauth_tokens_account_active
+    ON app.oauth_tokens(account_id, revoked_at);
+
+-- Enable Row-Level Security (RLS) for multi-tenant isolation on tenant-scoped tables
+ALTER TABLE IF EXISTS app.users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS app.api_keys ENABLE ROW LEVEL SECURITY;
+ALTER TABLE IF EXISTS app.usage ENABLE ROW LEVEL SECURITY;
+
+-- RLS: users
+DROP POLICY IF EXISTS users_tenant_isolation ON app.users;
+CREATE POLICY users_tenant_isolation ON app.users
+    USING (COALESCE(tenant_id, '') = COALESCE(current_setting('app.current_tenant', true), ''))
+    WITH CHECK (COALESCE(tenant_id, '') = COALESCE(current_setting('app.current_tenant', true), ''));
+
+-- RLS: api_keys
+DROP POLICY IF EXISTS api_keys_tenant_isolation ON app.api_keys;
+CREATE POLICY api_keys_tenant_isolation ON app.api_keys
+    USING (COALESCE(tenant_id, '') = COALESCE(current_setting('app.current_tenant', true), ''))
+    WITH CHECK (COALESCE(tenant_id, '') = COALESCE(current_setting('app.current_tenant', true), ''));
+
+-- RLS: usage
+DROP POLICY IF EXISTS usage_tenant_isolation ON app.usage;
+CREATE POLICY usage_tenant_isolation ON app.usage
+    USING (COALESCE(tenant_id, '') = COALESCE(current_setting('app.current_tenant', true), ''))
+    WITH CHECK (COALESCE(tenant_id, '') = COALESCE(current_setting('app.current_tenant', true), ''));
 
 -- Создаем триггер для обновления updated_at
 CREATE OR REPLACE FUNCTION update_updated_at_column()

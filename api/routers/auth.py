@@ -1,6 +1,7 @@
 """Authentication and API key management endpoints."""
 
 import hashlib
+import logging
 import secrets
 from datetime import datetime, timezone
 from typing import Any
@@ -19,10 +20,11 @@ from api.schemas.auth import (
     UserLogin,
     UserRegister,
 )
-from api.utils.jwt import create_user_token
+from api.utils.jwt import create_access_token
 from api.utils.password import hash_password, verify_password
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 # Create dependency variables to avoid calling Depends in argument defaults
 get_db = get_db_lazy
@@ -34,6 +36,7 @@ async def register(
     user_data: UserRegister, db: Session = Depends(get_db)  # noqa: B008
 ):
     """Register a new user with email and password."""
+    logger.info("/register start email=%s", user_data.email)
     # Check if user already exists
     from db.models import User
 
@@ -46,11 +49,12 @@ async def register(
 
     # Create new user
     hashed_password = hash_password(user_data.password)
-    new_user = User(email=user_data.email, password_hash=hashed_password, role="user")
+    new_user = User(email=user_data.email, hashed_password=hashed_password, role="user")
 
     db.add(new_user)
     db.commit()
     db.refresh(new_user)
+    logger.info("/register done id=%s", new_user.id)
 
     return UserInfo(
         id=int(new_user.id),
@@ -64,10 +68,12 @@ async def register(
 @router.post("/login", response_model=TokenResponse)
 async def login(user_data: UserLogin, db: Session = Depends(get_db)):  # noqa: B008
     """Login user with email and password."""
+    logger.info("/login start email=%s", user_data.email)
     from db.models import User
 
     # Find user by email
     user = db.query(User).filter(User.email == user_data.email).first()
+    logger.info("/login user_found=%s", bool(user))
     if not user:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password"
@@ -80,8 +86,13 @@ async def login(user_data: UserLogin, db: Session = Depends(get_db)):  # noqa: B
         )
 
     # Create access token
-    access_token = create_user_token(user)
-
+    access_token = create_access_token(
+        user_id=int(user.id),
+        email=str(user.email),
+        tenant_id=str(user.tenant_id) if user.tenant_id else None,
+        role=str(user.role),
+    )
+    logger.info("/login ok user_id=%s", user.id)
     return TokenResponse(access_token=access_token)
 
 
@@ -90,8 +101,15 @@ async def get_current_user_info(
     current_user: Any = Depends(get_current_user_dep),  # noqa: B008
 ):
     """Get current user information."""
+    # current_user.id может быть строкой (для API ключей вида "api_<id>") или int для обычных пользователей
+    try:
+        user_id_int = int(current_user.id)
+    except (TypeError, ValueError):
+        # Для API ключей возвращаем 0 как технический идентификатор пользователя
+        user_id_int = 0
+
     return UserInfo(
-        id=int(current_user.id),
+        id=user_id_int,
         email=str(current_user.email),
         tenant_id=str(current_user.tenant_id) if current_user.tenant_id else None,
         role=str(current_user.role),

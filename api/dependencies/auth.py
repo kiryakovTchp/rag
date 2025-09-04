@@ -1,6 +1,5 @@
 """Authentication dependencies."""
 
-import os
 from typing import Any, Optional
 
 import jwt
@@ -9,7 +8,9 @@ from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from fastapi.websockets import WebSocket
 from sqlalchemy.orm import Session
 
+from api.config import Settings, get_settings
 from api.dependencies.db import get_db_lazy
+from api.utils.jwt import decode_token
 
 # Lazy imports to prevent startup failures
 # from db.models import User, APIKey
@@ -37,8 +38,6 @@ async def get_current_user_ws(websocket: WebSocket) -> Optional[Any]:
 
         # Validate JWT token
         try:
-            from api.utils.jwt import decode_token
-
             payload = decode_token(token)
             if not payload:
                 return None
@@ -209,8 +208,6 @@ async def get_current_user(
 
     # Validate JWT token
     try:
-        from api.utils.jwt import decode_token
-
         payload = decode_token(token)
         if not payload:
             raise HTTPException(
@@ -254,26 +251,28 @@ async def get_current_user(
         ) from None
 
 
-def require_auth() -> bool:
+def require_auth(settings: Settings | None = None) -> bool:
     """Check if authentication is required.
 
     Defaults to true to ensure secure API access.
     Set REQUIRE_AUTH=false to disable authentication for development/testing.
     """
-    return os.getenv("REQUIRE_AUTH", "true").lower() == "true"
+    if settings is None:
+        settings = get_settings()
+    return settings.require_auth
 
 
 async def validate_jwt_token(token: str) -> Optional[dict[str, Any]]:
-    """Validate JWT token."""
-    secret = os.getenv("NEXTAUTH_SECRET")
-    if not secret:
-        return None
-
+    """Validate JWT token using unified secret handling."""
     try:
-        payload = jwt.decode(token, secret, algorithms=["HS256"])
+        from api.utils.jwt import decode_token as _decode
+
+        payload = _decode(token)
+        if not payload:
+            return None
         return {
             "tenant_id": payload.get("tenant_id"),
-            "user_id": payload.get("user_id"),
+            "user_id": payload.get("sub") or payload.get("user_id"),
             "role": payload.get("role", "user"),
         }
     except jwt.InvalidTokenError:
@@ -282,12 +281,10 @@ async def validate_jwt_token(token: str) -> Optional[dict[str, Any]]:
 
 async def validate_api_key(api_key: str, db: Session) -> Optional[dict[str, Any]]:
     """Validate API key."""
-    # Hash the API key
     import hashlib
 
     key_hash = hashlib.sha256(api_key.encode()).hexdigest()
 
-    # Check if key exists and is not revoked
     try:
         from db.models import APIKey
 

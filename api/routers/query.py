@@ -1,9 +1,8 @@
 """Query API router."""
 
-import os
+from fastapi import APIRouter, Depends, HTTPException
 
-from fastapi import APIRouter, HTTPException
-
+from api.config import Settings, get_settings
 from api.schemas.query import QueryMatch, QueryRequest, QueryResponse, QueryUsage
 from services.chunking.token import TokenTextSplitter
 from services.retrieve.context_builder import ContextBuilder
@@ -13,10 +12,12 @@ router = APIRouter(prefix="/query", tags=["query"])
 
 
 @router.post("/", response_model=QueryResponse)
-async def query(request: QueryRequest) -> QueryResponse:
+async def query(
+    request: QueryRequest, settings: Settings = Depends(get_settings)  # noqa: B008
+) -> QueryResponse:
     """Search for relevant chunks."""
     # Validate rerank availability
-    if request.rerank and not os.getenv("RERANK_ENABLED", "false").lower() == "true":
+    if request.rerank and not settings.rerank_enabled:
         raise HTTPException(
             status_code=400,
             detail="Reranking is not enabled. Set RERANK_ENABLED=true to enable.",
@@ -26,9 +27,7 @@ async def query(request: QueryRequest) -> QueryResponse:
     try:
         from services.retrieve.hybrid import HybridRetriever
 
-        retriever = HybridRetriever(
-            embed_provider=os.getenv("EMBED_PROVIDER", "workers_ai")
-        )
+        retriever = HybridRetriever(embed_provider=settings.embed_provider)
     except ImportError:
         raise HTTPException(
             status_code=503, detail="Retrieval service temporarily unavailable"
@@ -67,6 +66,7 @@ async def query(request: QueryRequest) -> QueryResponse:
     return QueryResponse(
         matches=response_matches,
         usage=QueryUsage(in_tokens=in_tokens, out_tokens=out_tokens),
+        query=request.query,
     )
 
 

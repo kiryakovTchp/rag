@@ -1,13 +1,16 @@
 """WebSocket endpoint for real-time communication."""
 
+import asyncio
 import json
 import logging
+import os
 from typing import Any
 
+import redis.asyncio as aioredis
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect
 from fastapi.responses import HTMLResponse
 
-from api.auth import get_current_user_ws
+from api.dependencies.auth import get_current_user_ws
 from services.events.bus import publish_event
 
 logger = logging.getLogger(__name__)
@@ -111,8 +114,8 @@ async def websocket_endpoint(websocket: WebSocket):
             return
 
         # Subscribe to user's events
-        tenant_id = user.get("tenant_id", "unknown")
-        user_id = user.get("user_id", "unknown")
+        tenant_id = getattr(user, "tenant_id", "unknown")
+        user_id = getattr(user, "id", "unknown")
 
         logger.info(f"User {user_id} connected to WebSocket for tenant {tenant_id}")
 
@@ -156,6 +159,92 @@ async def websocket_endpoint(websocket: WebSocket):
     except Exception as e:
         logger.error(f"WebSocket connection error: {e}")
         manager.disconnect(websocket)
+
+
+@router.websocket("/ws/jobs")
+async def websocket_jobs(websocket: WebSocket):
+    """WebSocket endpoint for job events via Redis Pub/Sub."""
+    await websocket.accept()
+
+    # Auth
+    user = await get_current_user_ws(websocket)
+    if not user:
+        await websocket.close(code=4001, reason="Unauthorized")
+        return
+
+    tenant_id = getattr(user, "tenant_id", None) or websocket.query_params.get(
+        "tenant_id"
+    )
+    if not tenant_id:
+        await websocket.close(code=4002, reason="No tenant_id provided")
+        return
+
+    # Connect Redis
+    try:
+        from api.config import get_settings
+
+        redis_url = get_settings().redis_url or os.getenv(
+            "REDIS_URL", "redis://localhost:6379"
+        )
+    except Exception:
+        redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+    try:
+        redis = aioredis.from_url(redis_url)
+        pubsub = redis.pubsub()
+        topic = f"{tenant_id}.jobs"
+        await pubsub.subscribe(topic)
+    except Exception:
+        try:
+            await websocket.close(code=4000, reason="Redis unavailable")
+        finally:
+            return
+
+    # Send connected event
+    await websocket.send_text(
+        json.dumps({"event": "connected", "tenant_id": tenant_id})
+    )
+
+    async def redis_listener():
+        try:
+            async for message in pubsub.listen():
+                if message.get("type") == "message":
+                    try:
+                        payload = json.loads(message.get("data"))
+                    except Exception:
+                        payload = {"error": "Invalid JSON"}
+                    await websocket.send_text(json.dumps(payload))
+        except Exception as e:
+            logger.error(f"Redis listener error: {e}")
+
+    async def ws_listener():
+        try:
+            while True:
+                data = await websocket.receive_text()
+                try:
+                    msg = json.loads(data)
+                    if msg.get("type") == "ping":
+                        await websocket.send_text(json.dumps({"type": "pong"}))
+                except json.JSONDecodeError:
+                    await websocket.send_text(json.dumps({"error": "Invalid JSON"}))
+        except WebSocketDisconnect:
+            pass
+        except Exception as e:
+            logger.error(f"WebSocket listener error: {e}")
+
+    try:
+        await asyncio.gather(redis_listener(), ws_listener())
+    except WebSocketDisconnect:
+        pass
+    finally:
+        try:
+            await pubsub.unsubscribe(topic)
+            await pubsub.close()
+        except Exception:
+            pass
+        try:
+            await redis.close()
+        except Exception:
+            pass
 
 
 @router.post("/publish/{topic}")

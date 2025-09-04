@@ -10,7 +10,7 @@ from alembic import op
 
 # revision identifiers, used by Alembic.
 revision = "20250127_add_api_keys"
-down_revision = "20250127_add_answer_logs_table"
+down_revision = "20250127_add_answer_logs"
 branch_labels = None
 depends_on = None
 

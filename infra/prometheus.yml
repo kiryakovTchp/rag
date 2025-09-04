@@ -14,34 +14,32 @@ scrape_configs:
   # FastAPI API
   - job_name: 'api'
     static_configs:
-      - targets: ['host.docker.internal:8000']
+      - targets: ['api:8000']
     metrics_path: '/metrics'
     scrape_interval: 10s
     scrape_timeout: 5s
 
-  # Celery Workers (if they expose metrics)
-  - job_name: 'workers'
-    static_configs:
-      - targets: ['host.docker.internal:8001']
-    metrics_path: '/metrics'
-    scrape_interval: 10s
-    scrape_timeout: 5s
+  # Celery Workers: expose a /metrics endpoint to enable this job
+  # - job_name: 'workers'
+  #   static_configs:
+  #     - targets: ['worker:8001']
+  #   metrics_path: '/metrics'
+  #   scrape_interval: 10s
+  #   scrape_timeout: 5s
 
-  # Redis
-  - job_name: 'redis'
-    static_configs:
-      - targets: ['redis:6379']
-    metrics_path: '/metrics'
-    scrape_interval: 30s
-    scrape_timeout: 10s
-
-  # PostgreSQL (if pg_exporter is used)
-  - job_name: 'postgres'
-    static_configs:
-      - targets: ['postgres:5432']
-    metrics_path: '/metrics'
-    scrape_interval: 30s
-    scrape_timeout: 10s
+  # Redis and Postgres exporters are not configured by default.
+  # Enable when exporters are added:
+  # - job_name: 'redis'
+  #   static_configs:
+  #     - targets: ['redis_exporter:9121']
+  #   scrape_interval: 30s
+  #   scrape_timeout: 10s
+  #
+  # - job_name: 'postgres'
+  #   static_configs:
+  #     - targets: ['postgres_exporter:9187']
+  #   scrape_interval: 30s
+  #   scrape_timeout: 10s
 
 alerting:
   alertmanagers:

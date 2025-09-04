@@ -4,41 +4,31 @@
 
 ## 🚀 Быстрый старт
 
-### Вариант 1: Docker Compose (рекомендуется)
+### Prod (рекомендуется)
 
 ```bash
-# Клонируйте репозиторий
+# Клонируйте репозиторий и подготовьте .env
 git clone https://github.com/kiryakovTchp/rag.git
 cd rag
-
-# Настройте переменные окружения
 cp env.example .env
-# Отредактируйте .env файл, особенно JWT_SECRET_KEY
+# Заполните .env: JWT_SECRET_KEY, SESSION_SECRET и др.
 
-# Запустите базу данных и Redis
-docker compose up -d db redis
+# Запустите все сервисы (DB+Redis+API+Worker+Frontend+Prometheus+Grafana)
+docker compose up -d
 
-# Запустите API и worker
-docker compose up -d api worker
-
-# Запустите фронтенд
-cd web && npm ci && npm run build && npm run dev
+# Миграции применяются автоматически (alembic upgrade head)
+curl -f http://localhost:8000/health
 ```
 
-### Вариант 2: Ручной запуск
+### Dev (быстрая разработка)
 
 ```bash
-# Установите зависимости
-make install-deps
+# 1) Создайте и заполните .env
 
-# Запустите базу данных и Redis
-docker-compose up -d postgres redis
+# 2) Запуск dev окружения (API --reload, фронт через Vite)
+docker compose -f docker-compose.dev.yml up
 
-# Запустите API
-cd api && uvicorn main:app --reload --host 0.0.0.0 --port 8000
-
-# В другом терминале запустите фронтенд
-cd web && npm run dev
+# API: http://localhost:8000, Frontend: http://localhost:3000
 ```
 
 ## 🏗️ Архитектура
@@ -58,16 +48,17 @@ cd web && npm run dev
 - **React Router** - навигация
 
 ### Мониторинг
-- **Prometheus** - метрики
+- **Prometheus** - метрики (экспортёры Redis/Postgres опционально)
 - **Grafana** - дашборды
 - **OpenTelemetry** - трассировка
 
 ## 🔐 Аутентификация
 
-### Google OAuth
-- Интеграция с Google для входа
-- JWT токены для API
-- Безопасные сессии
+Аутентификация:
+- Email/пароль: `POST /register`, `POST /login`, `GET /me`
+- API ключи: `POST /api-keys`, `GET /api-keys`, `DELETE /api-keys/{id}`
+- Google OAuth: `/auth/google` (start/callback), хранение state в сессии
+- JWT: HS256 (`JWT_SECRET_KEY`) — секреты централизованы через `api/config.py`
 
 ### Тестовый аккаунт
 ```bash
@@ -81,12 +72,7 @@ make test-user
 
 ## 📱 Основные страницы
 
-- **Landing** - маркетинговая страница
-- **Login/Register** - аутентификация
-- **Dashboard** - главная панель
-- **Documents** - управление документами
-- **Search** - AI поиск по документам
-- **Settings** - настройки профиля
+- Landing, Login/Register, Dashboard, Documents, Search, Chat
 
 ## 🛠️ Управление проектом
 
@@ -125,52 +111,44 @@ make frontend-shell # Подключиться к фронтенд контей�
 - **База данных**: localhost:5432
 - **Redis**: localhost:6379
 
-## 🔧 Конфигурация
+## 🔧 Конфигурация / ENV
 
-### Переменные окружения
-Скопируйте `env.example` в `.env` и настройте:
+Все переменные сведены в одном месте (`api/config.py`) и читаются через `get_settings()`. Шаблоны: `.env.example`, `env.example`.
 
-```bash
-# Google OAuth
-GOOGLE_CLIENT_ID=ваш-client-id
-GOOGLE_CLIENT_SECRET=ваш-client-secret
-
-# JWT
-JWT_SECRET_KEY=ваш-секретный-ключ
-
-# База данных
-DATABASE_URL=postgresql://rag_user:rag_password@localhost:5432/rag_db
-
-# Redis
-REDIS_URL=redis://localhost:6379
-```
+Минимальный набор:
+- Auth: `JWT_SECRET_KEY`, `SESSION_SECRET`, `REQUIRE_AUTH`
+- Подключения: `DATABASE_URL`, `REDIS_URL`
+- Хранилище: `S3_ENDPOINT`, `S3_ACCESS_KEY_ID`, `S3_SECRET_ACCESS_KEY` (локально MinIO)
+- Инференс: `EMBED_PROVIDER` (local | workers_ai), `WORKERS_AI_TOKEN` (и/или `WORKERS_AI_*` для rerank)
+- OAuth: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`, `GOOGLE_REDIRECT_URI`
 
 ### Google OAuth настройка
 Подробная инструкция: [docs/GOOGLE_OAUTH_SETUP.md](docs/GOOGLE_OAUTH_SETUP.md)
 
-## 📊 API Endpoints
+## 📊 API (основные)
 
-### Аутентификация
-- `POST /auth/login` - вход с email/password
-- `POST /auth/register` - регистрация
-- `POST /auth/google` - вход через Google
-- `POST /auth/logout` - выход
+Аутентификация и ключи:
+- `POST /register`, `POST /login`, `GET /me`
+- `POST /api-keys`, `GET /api-keys`, `DELETE /api-keys/{id}`
 
-### Документы
-- `GET /documents` - список документов
-- `POST /documents/upload` - загрузка документа
-- `GET /documents/{id}` - получение документа
-- `DELETE /documents/{id}` - удаление документа
+Ингест:
+- `POST /ingest` (multipart/form-data: file, tenant_id?, safe_mode?)
+- `GET /ingest/{job_id}`
+- `GET /ingest/document/{document_id}`
 
-### Поиск
-- `POST /query` - AI поиск по документам
-- `GET /ws/jobs` - WebSocket для отслеживания задач
+Поиск и ответы:
+- `POST /query` (body: query, top_k, rerank, max_ctx)
+- `POST /answer`, `POST /answer/stream`
+- `GET /chunks/{id}` (получение текста фрагмента)
 
-### Пользователи
-- `GET /user/profile` - профиль пользователя
-- `PUT /user/profile` - обновление профиля
-- `GET /user/keys` - API ключи
-- `POST /user/keys` - создание API ключа
+Feedback:
+- `POST /feedback`, `GET /feedback/{answer_id}`, `GET /feedback?limit&offset`
+
+Realtime:
+- `GET /ws` (тест), `GET /ws/jobs` (события задач)
+
+Сервисные:
+- `GET /metrics`, `GET /health`, `GET /healthz`
 
 ## 🧪 Тестирование
 
@@ -188,40 +166,12 @@ cd web && npm run test:e2e
 ## 📈 Мониторинг
 
 ### Prometheus метрики
-- `query_latency_seconds` - задержка запросов
-- `ingest_job_duration_seconds` - время обработки документов
-- `tenant_queries_total` - количество запросов
-- `redis_publish_failures_total` - ошибки Redis
-
-### Grafana дашборды
-- **Ingest** - загрузка и обработка документов
-- **Query** - поиск и ответы
-- **Realtime** - WebSocket соединения
-- **Errors** - ошибки и исключения
+Экспорт метрик API доступен по `/metrics`. Экспортёры Redis/Postgres по умолчанию выключены — добавьте их в compose и включите джобы в `infra/prometheus.yml`.
 
 ## 🚀 Развертывание
 
 ### Production
-```bash
-# Сборка для продакшена
-make build-frontend
-make build-backend
-
-# Запуск в production режиме
-docker-compose -f docker-compose.prod.yml up -d
-```
-
-### Docker
-```bash
-# Сборка образов
-docker-compose build
-
-# Запуск
-docker-compose up -d
-
-# Остановка
-docker-compose down
-```
+Стандартный `docker compose up -d` (миграции Alembic применяются автоматически). Для dev используйте `docker-compose.dev.yml`.
 
 ## 🤝 Разработка
 
@@ -234,6 +184,12 @@ rag/
 ├── workers/             # Celery workers
 ├── db/                  # База данных
 ├── infra/               # Docker конфигурация
+│   ├── Dockerfile.api
+│   ├── Dockerfile.worker
+│   ├── Dockerfile.frontend
+│   ├── prometheus.yml
+│   └── docker-compose.yml (внутренний)
+├── docker-compose.dev.yml  # dev-окружение (Vite + reload)
 ├── docs/                # Документация
 └── scripts/             # Скрипты
 ```
@@ -248,6 +204,7 @@ rag/
 ## 📚 Документация
 
 - [Google OAuth Setup](docs/GOOGLE_OAUTH_SETUP.md)
+- ENV/Secrets: см. `.env.example` / `env.example` и `api/config.py`
 - [Unification Report](docs/UNIFICATION_REPORT.md)
 - [Engineering Log](docs/ENGINEERING_LOG.md)
 - [ADR](docs/adr/)

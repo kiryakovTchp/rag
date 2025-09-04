@@ -18,11 +18,24 @@ class WorkersAIEmbedder:
             api_token: Cloudflare Workers AI API token
             batch_size: Batch size for embedding generation
         """
-        self.api_token = api_token or os.getenv("WORKERS_AI_TOKEN")
-        self.workers_url = os.getenv(
-            "WORKERS_AI_URL",
-            "https://api.cloudflare.com/client/v4/ai/run/@cf/baai/bge-m3",
-        )
+        # Prefer centralized settings, fallback to env for worker context
+        try:
+            from api.config import get_settings
+
+            settings = get_settings()
+            self.api_token = (
+                api_token or settings.workers_ai_token or os.getenv("WORKERS_AI_TOKEN")
+            )
+            self.workers_url = settings.workers_ai_url or os.getenv(
+                "WORKERS_AI_URL",
+                "https://api.cloudflare.com/client/v4/ai/run/@cf/baai/bge-m3",
+            )
+        except Exception:
+            self.api_token = api_token or os.getenv("WORKERS_AI_TOKEN")
+            self.workers_url = os.getenv(
+                "WORKERS_AI_URL",
+                "https://api.cloudflare.com/client/v4/ai/run/@cf/baai/bge-m3",
+            )
         self.model_id = os.getenv("MODEL_ID", "@cf/baai/bge-m3")
 
         if not self.api_token:

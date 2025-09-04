@@ -21,15 +21,35 @@ groups:
           summary: "High error rate detected"
           description: "Error rate is {{ $value | humanizePercentage }} for the last 5 minutes"
 
-      # Redis publish failures
-      - alert: RedisPublishFailures
-        expr: increase(redis_publish_failures_total[1m]) > 0
-        for: 1m
+      # 4xx spike alert
+      - alert: HighClientErrorRate
+        expr: rate(http_requests_total{status=~"4.."}[5m]) / rate(http_requests_total[5m]) > 0.05
+        for: 5m
         labels:
           severity: warning
         annotations:
-          summary: "Redis publish failures detected"
-          description: "{{ $value }} Redis publish failures in the last minute"
+          summary: "High 4xx rate detected"
+          description: "Client error rate is {{ $value | humanizePercentage }} for the last 5 minutes"
+
+      # Rate-limit storms
+      - alert: RateLimitStorm
+        expr: rate(rate_limit_exceeded_total[2m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Rate limit storm detected"
+          description: "Rate limit exceeded events > 10/min"
+
+      # Token expiry (approx via 401 spike)
+      - alert: TokenExpirySpike
+        expr: rate(http_requests_total{status="401"}[5m]) / rate(http_requests_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Possible token expiry spike"
+          description: "401 responses exceed 10% of traffic in last 5 minutes"
 
   - name: worker_alerts
     rules:

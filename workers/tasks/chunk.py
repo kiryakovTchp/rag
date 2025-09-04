@@ -96,6 +96,7 @@ def chunk_document(self, document_id: int, tenant_id: Optional[str] = None) -> d
         for chunk_data in chunks_data:
             chunk = Chunk(
                 document_id=document_id,
+                tenant_id=tenant_id,
                 element_id=chunk_data.get("element_id"),
                 level=chunk_data["level"],
                 header_path=chunk_data.get("header_path"),

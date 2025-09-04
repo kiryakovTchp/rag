@@ -7,6 +7,7 @@ from sqlalchemy import (
     DateTime,
     Enum,
     ForeignKey,
+    Index,
     Integer,
     MetaData,
     String,
@@ -25,6 +26,7 @@ class Document(Base):
     __tablename__ = "documents"
 
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(100), nullable=True, index=True)
     name = Column(String(255), nullable=False)
     mime = Column(String(100), nullable=False)
     storage_uri = Column(String(500), nullable=False)
@@ -45,7 +47,8 @@ class Job(Base):
     status = Column(String(50), default="queued")  # queued, running, done, error
     progress = Column(Integer, default=0)  # 0-100
     error = Column(Text, nullable=True)
-    document_id = Column(Integer, ForeignKey("app.documents.id"), nullable=False)
+    # Nullable by design: a job may not be tied to a specific document
+    document_id = Column(Integer, ForeignKey("app.documents.id"), nullable=True)
     created_at = Column(DateTime, default=func.now())
     updated_at = Column(DateTime, default=func.now(), onupdate=func.now())
 
@@ -57,7 +60,8 @@ class Element(Base):
     __tablename__ = "elements"
 
     id = Column(Integer, primary_key=True, index=True)
-    document_id = Column(Integer, ForeignKey("documents.id"), nullable=False)
+    tenant_id = Column(String(100), nullable=True, index=True)
+    document_id = Column(Integer, ForeignKey("app.documents.id"), nullable=False)
     type = Column(String(50), nullable=False)  # text, title, list, table, code, image
     page = Column(Integer, nullable=True)
     bbox = Column(JSON, nullable=True)  # bounding box coordinates
@@ -73,6 +77,7 @@ class Chunk(Base):
     __tablename__ = "chunks"
 
     id = Column(Integer, primary_key=True, index=True)
+    tenant_id = Column(String(100), nullable=True, index=True)
     document_id = Column(Integer, ForeignKey("app.documents.id"), nullable=False)
     element_id = Column(Integer, ForeignKey("app.elements.id"), nullable=True)
     level = Column(String(50), nullable=False)  # section, passage, table
@@ -81,10 +86,16 @@ class Chunk(Base):
     token_count = Column(Integer, nullable=False)
     page = Column(Integer, nullable=True)
     table_meta = Column(JSON, nullable=True)  # table metadata
+    # ACL principals for multi-tenant and per-principal access control
+    acl_principals = Column(ARRAY(Text), nullable=True)
 
     # Relationships
     document = relationship("Document", back_populates="chunks")
     element = relationship("Element", back_populates="chunks")
+
+
+# Index for searching by ACL principals
+Index("ix_chunks_acl_principals", Chunk.acl_principals, postgresql_using="gin")
 
 
 class Embedding(Base):
@@ -93,6 +104,7 @@ class Embedding(Base):
     chunk_id = Column(
         Integer, ForeignKey("app.chunks.id", ondelete="CASCADE"), primary_key=True
     )
+    tenant_id = Column(String(100), nullable=True, index=True)
     vector = Column(Vector(1024), nullable=False, index=False)  # pgvector vector(1024)
     provider = Column(String(50), nullable=False)  # local, workers_ai
     created_at = Column(DateTime(timezone=True), default=func.now())
@@ -162,3 +174,54 @@ class AnswerFeedback(Base):
     created_at = Column(
         DateTime(timezone=True), server_default=text("now()"), nullable=False
     )
+
+
+class OAuthAccount(Base):
+    __tablename__ = "oauth_accounts"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(
+        Integer, ForeignKey("app.users.id", ondelete="CASCADE"), nullable=False
+    )
+    tenant_id = Column(String(100), nullable=True, index=True)
+    provider = Column(String(50), nullable=False)  # google, notion, confluence
+    account_id = Column(
+        String(255), nullable=False, index=True
+    )  # provider user id / resource id
+    scopes = Column(ARRAY(String), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    # Relationships
+    user = relationship("User")
+
+
+class OAuthToken(Base):
+    __tablename__ = "oauth_tokens"
+
+    id = Column(Integer, primary_key=True, index=True)
+    account_id = Column(
+        Integer, ForeignKey("app.oauth_accounts.id", ondelete="CASCADE"), nullable=False
+    )
+    tenant_id = Column(String(100), nullable=True, index=True)
+    access_token_encrypted = Column(Text, nullable=False)
+    refresh_token_encrypted = Column(Text, nullable=True)
+    expires_at = Column(DateTime(timezone=True), nullable=True)
+    revoked_at = Column(DateTime(timezone=True), nullable=True)
+    created_at = Column(
+        DateTime(timezone=True), server_default=text("now()"), nullable=False
+    )
+
+    # Relationships
+    account = relationship("OAuthAccount")
+
+
+# Indexes
+Index(
+    "ix_oauth_accounts_provider_account",
+    OAuthAccount.provider,
+    OAuthAccount.account_id,
+    unique=True,
+)
+Index("ix_oauth_tokens_account_active", OAuthToken.account_id, OAuthToken.revoked_at)

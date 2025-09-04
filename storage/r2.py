@@ -5,18 +5,44 @@ from typing import BinaryIO
 import boto3
 from botocore.exceptions import ClientError
 
+try:
+    from api.config import get_settings
+except Exception:  # workers context may import storage without API
+    get_settings = None  # type: ignore
+
 logger = logging.getLogger(__name__)
 
 
 class ObjectStore:
     def __init__(self) -> None:
-        self.endpoint = os.getenv("S3_ENDPOINT", "http://minio:9000")
-        self.region = os.getenv("S3_REGION", "us-east-1")
-        self.bucket = os.getenv("S3_BUCKET", "promoai")
+        if get_settings:
+            try:
+                settings = get_settings()
+                self.endpoint = settings.s3_endpoint or os.getenv(
+                    "S3_ENDPOINT", "http://minio:9000"
+                )
+                self.region = settings.s3_region or os.getenv("S3_REGION", "us-east-1")
+                self.bucket = settings.s3_bucket or os.getenv("S3_BUCKET", "promoai")
+            except Exception:
+                self.endpoint = os.getenv("S3_ENDPOINT", "http://minio:9000")
+                self.region = os.getenv("S3_REGION", "us-east-1")
+                self.bucket = os.getenv("S3_BUCKET", "promoai")
+        else:
+            self.endpoint = os.getenv("S3_ENDPOINT", "http://minio:9000")
+            self.region = os.getenv("S3_REGION", "us-east-1")
+            self.bucket = os.getenv("S3_BUCKET", "promoai")
 
         # Check for S3 credentials
-        self.access_key = os.getenv("S3_ACCESS_KEY_ID")
-        self.secret_key = os.getenv("S3_SECRET_ACCESS_KEY")
+        if get_settings:
+            try:
+                self.access_key = settings.s3_access_key_id or os.getenv("S3_ACCESS_KEY_ID")  # type: ignore[name-defined]
+                self.secret_key = settings.s3_secret_access_key or os.getenv("S3_SECRET_ACCESS_KEY")  # type: ignore[name-defined]
+            except Exception:
+                self.access_key = os.getenv("S3_ACCESS_KEY_ID")
+                self.secret_key = os.getenv("S3_SECRET_ACCESS_KEY")
+        else:
+            self.access_key = os.getenv("S3_ACCESS_KEY_ID")
+            self.secret_key = os.getenv("S3_SECRET_ACCESS_KEY")
 
         if not self.access_key or not self.secret_key:
             logger.warning(
@@ -36,8 +62,12 @@ class ObjectStore:
             use_ssl=False,  # For local MinIO
         )
 
-        # Ensure bucket exists
-        # self.ensure_bucket()  # Temporarily disabled for testing
+        # Ensure bucket exists (best-effort)
+        try:
+            self.ensure_bucket()
+        except Exception:
+            # In dev environments MinIO may be initializing; ignore on init
+            pass
 
     def ensure_bucket(self) -> None:
         """Ensure the bucket exists, create if it doesn't."""

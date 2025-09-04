@@ -10,6 +10,7 @@ services:
     depends_on: [db, redis, minio]
     ports: ["8000:8000"]
     volumes: ["..:/app"]
+    command: bash -c "alembic upgrade head && uvicorn api.main:app --host 0.0.0.0 --port 8000"
   worker:
     build: { context: .., dockerfile: infra/Dockerfile.worker }
     env_file: ../.env
@@ -19,8 +20,9 @@ services:
       - S3_ENDPOINT=http://minio:9000
     depends_on: [db, redis, minio]
     volumes: ["..:/app"]
+    command: celery -A workers.app worker --loglevel=info
   db:
-    image: postgres:16
+    image: pgvector/pgvector:pg16
     environment:
       POSTGRES_PASSWORD: postgres
     ports: ["5432:5432"]
@@ -32,7 +34,11 @@ services:
       retries: 5
   redis:
     image: redis:7
-    ports: ["6379:6379"]
+    healthcheck:
+      test: ["CMD-SHELL","redis-cli ping | grep PONG"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
   minio:
     image: minio/minio
     command: server /data --console-address ":9001"

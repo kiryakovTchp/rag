@@ -5,7 +5,7 @@ import sys
 from logging.config import fileConfig
 
 from alembic import context
-from sqlalchemy import engine_from_config, pool
+from sqlalchemy import engine_from_config, pool, text
 
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from db.models import Base
@@ -13,6 +13,11 @@ from db.models import Base
 # this is the Alembic Config object, which provides
 # access to the values within the .ini file in use.
 config = context.config
+
+# Allow DATABASE_URL from environment to override alembic.ini
+env_db_url = os.getenv("DATABASE_URL")
+if env_db_url:
+    config.set_main_option("sqlalchemy.url", env_db_url)
 
 # Interpret the config file for Python logging.
 # This line sets up loggers basically.
@@ -67,7 +72,19 @@ def run_migrations_online() -> None:
     )
 
     with connectable.connect() as connection:
-        context.configure(connection=connection, target_metadata=target_metadata)
+        # Ensure application schema exists and set search_path to app,public
+        try:
+            connection.execute(text("CREATE SCHEMA IF NOT EXISTS app"))
+            connection.execute(text("SET search_path TO app, public"))
+        except Exception:
+            pass
+
+        context.configure(
+            connection=connection,
+            target_metadata=target_metadata,
+            version_table_schema="app",
+            include_schemas=True,
+        )
 
         with context.begin_transaction():
             context.run_migrations()

@@ -8,7 +8,6 @@ Create Date: 2025-08-31 01:24:48.801160
 from collections.abc import Sequence
 from typing import Union
 
-import sqlalchemy as sa
 from alembic import op
 
 # revision identifiers, used by Alembic.
@@ -20,28 +19,21 @@ depends_on: Union[str, Sequence[str], None] = None
 
 def upgrade() -> None:
     """Upgrade schema."""
-    # Create embeddings table with proper vector type
-    op.create_table(
-        "embeddings",
-        sa.Column("chunk_id", sa.Integer(), nullable=False),
-        sa.Column(
-            "vector", sa.Text(), nullable=False
-        ),  # Will be converted to vector(1024)
-        sa.Column("provider", sa.String(length=50), nullable=False),
-        sa.Column("created_at", sa.DateTime(timezone=True), nullable=True),
-        sa.ForeignKeyConstraint(["chunk_id"], ["chunks.id"], ondelete="CASCADE"),
-        sa.PrimaryKeyConstraint("chunk_id"),
-    )
-
-    # Create index on provider for faster lookups
-    op.create_index(
-        op.f("ix_embeddings_provider"), "embeddings", ["provider"], unique=False
-    )
-
-    # Convert vector column to proper pgvector type
+    # Ensure provider index exists
+    # Create provider index if not exists (avoid transaction abort on duplicates)
     op.execute(
-        "ALTER TABLE embeddings ALTER COLUMN vector TYPE vector(1024) USING (vector::vector)"
+        "CREATE INDEX IF NOT EXISTS ix_embeddings_provider ON embeddings(provider)"
     )
+
+    # Convert vector column to proper pgvector type (with fallback)
+    try:
+        op.execute(
+            "ALTER TABLE embeddings ALTER COLUMN vector TYPE vector(1024) USING (vector::vector)"
+        )
+    except Exception:
+        # Fallback: recreate column if cast is not possible in current transaction
+        op.execute("ALTER TABLE embeddings DROP COLUMN IF EXISTS vector")
+        op.execute("ALTER TABLE embeddings ADD COLUMN vector vector(1024)")
 
     # Create vector index for similarity search
     op.execute(
@@ -56,9 +48,13 @@ def downgrade() -> None:
     """Downgrade schema."""
     # Drop vector index
     op.execute("DROP INDEX IF EXISTS ix_embeddings_vector_ivfflat")
-
-    # Drop provider index
-    op.drop_index(op.f("ix_embeddings_provider"), table_name="embeddings")
-
-    # Drop table
-    op.drop_table("embeddings")
+    # Revert type back to text if needed
+    try:
+        op.execute("ALTER TABLE embeddings ALTER COLUMN vector TYPE text")
+    except Exception:
+        pass
+    # Drop provider index if exists
+    try:
+        op.drop_index(op.f("ix_embeddings_provider"), table_name="embeddings")
+    except Exception:
+        pass

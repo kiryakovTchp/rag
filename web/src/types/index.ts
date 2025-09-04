@@ -40,7 +40,7 @@ export interface Job {
 
 // Search types
 export interface SearchQuery {
-  question: string
+  query: string
   top_k?: number
   rerank?: boolean
   bm25?: boolean
@@ -48,8 +48,8 @@ export interface SearchQuery {
 }
 
 export interface SearchResult {
-  doc_id: string
-  chunk_id: string
+  doc_id: number
+  chunk_id: number
   page?: number
   score: number
   snippet: string

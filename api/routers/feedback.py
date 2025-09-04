@@ -26,10 +26,22 @@ async def create_feedback(
     # Create feedback record
     from db.models import AnswerFeedback
 
+    # Аккуратно определяем user_id: для API-ключей (идентификатор строка с префиксом "api_") не сохраняем пользователя
+    user_id_value = None
+    try:
+        if isinstance(current_user.id, str):
+            user_id_value = (
+                None if current_user.id.startswith("api_") else current_user.id
+            )
+        elif isinstance(current_user.id, int):
+            user_id_value = str(current_user.id)
+    except Exception:
+        user_id_value = None
+
     feedback = AnswerFeedback(
         answer_id=feedback_data.answer_id,
         tenant_id=current_user.tenant_id,
-        user_id=current_user.id if not current_user.id.startswith("api_") else None,
+        user_id=user_id_value,
         rating=feedback_data.rating,
         reason=feedback_data.reason,
         selected_citation_ids=feedback_data.selected_citation_ids,

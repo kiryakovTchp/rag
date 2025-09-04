@@ -1,11 +1,13 @@
 """Authentication middleware for storing user information in request.state."""
 
 import hashlib
+import logging
 
 from fastapi import Request
 
 from api.dependencies.db import get_db_lazy
 from api.utils.jwt import decode_token
+from db.session import set_current_tenant
 
 
 async def auth_middleware(request: Request, call_next):
@@ -19,8 +21,18 @@ async def auth_middleware(request: Request, call_next):
     request.state.tenant_id = None
 
     try:
+        logger = logging.getLogger(__name__)
+        logger.info("auth_mw start %s %s", request.method, request.url.path)
         # Skip auth for certain paths
-        if request.url.path in ["/healthz", "/docs", "/openapi.json"]:
+        if request.url.path in [
+            "/login",
+            "/register",
+            "/health",
+            "/healthz",
+            "/docs",
+            "/openapi.json",
+        ]:
+            logger.info("auth_mw skip %s", request.url.path)
             response = await call_next(request)
             return response
 
@@ -41,6 +53,7 @@ async def auth_middleware(request: Request, call_next):
                     }
                     request.state.user = user_dict
                     request.state.tenant_id = user_dict.get("tenant_id")
+                    set_current_tenant(user_dict.get("tenant_id"))
             except Exception:
                 # JWT failed, try API key
                 try:
@@ -68,6 +81,7 @@ async def auth_middleware(request: Request, call_next):
                             }
                             request.state.user = user_dict
                             request.state.tenant_id = user_dict.get("tenant_id")
+                            set_current_tenant(user_dict.get("tenant_id"))
                     finally:
                         try:
                             next(db_gen)
@@ -77,10 +91,12 @@ async def auth_middleware(request: Request, call_next):
                     # API key validation failed
                     pass
 
+        logger.info("auth_mw next %s", request.url.path)
         response = await call_next(request)
         return response
 
     except Exception:
         # If anything goes wrong, continue without user info
+        logger.exception("auth_mw error; proceeding without auth")
         response = await call_next(request)
         return response

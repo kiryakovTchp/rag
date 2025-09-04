@@ -1,11 +1,54 @@
 name: CI
-on: [push, pull_request]
+
+on:
+  push:
+    branches: [ main, develop, "feature/**", "fix/**", "feat/**", "refactor/**" ]
+  pull_request:
+    branches: [ main, develop ]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
+  pre-commit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install pre-commit
+        run: |
+          python -m pip install --upgrade pip
+          pip install pre-commit
+      - name: Run pre-commit
+        uses: pre-commit/action@v3.0.1
+
+  lint:
+    runs-on: ubuntu-latest
+    needs: pre-commit
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      - name: Install linters
+        run: |
+          python -m pip install --upgrade pip
+          pip install ruff mypy
+      - name: Ruff (annotations)
+        run: ruff check . --output-format=github
+      - name: Mypy
+        run: mypy .
   test:
     runs-on: ubuntu-latest
+    needs: lint
     services:
       postgres:
-        image: postgres:16
+        image: pgvector/pgvector:pg16
         env:
           POSTGRES_PASSWORD: postgres
         ports: ["5432:5432"]
@@ -44,7 +87,6 @@ jobs:
       - run: pip install -U pip uv
       - run: uv pip install --system -r requirements.txt || true
       - run: pip install -e . || true
-      - run: pre-commit install
       - run: bash scripts/banlist.sh
       - run: bash scripts/check_wireup.sh
       - run: python -c "import boto3, fitz; print('deps ok')"
@@ -56,6 +98,6 @@ jobs:
       - name: Wait for services
         run: sleep 5
       - name: Check API health
-        run: curl -f http://localhost:8000/healthz || exit 1
+        run: curl -f http://localhost:8000/health || exit 1
       - name: Run tests
         run: pytest -q tests/test_embed_pgvector.py tests/test_index_pgvector.py tests/test_query_api.py --maxfail=1

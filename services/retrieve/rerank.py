@@ -6,6 +6,8 @@ import time
 
 import requests
 
+from api.config import get_settings
+
 logger = logging.getLogger(__name__)
 
 
@@ -14,8 +16,17 @@ class WorkersAIReranker:
 
     def __init__(self):
         """Initialize reranker."""
-        self.api_url = os.getenv("WORKERS_AI_RERANK_URL")
-        self.api_key = os.getenv("WORKERS_AI_API_KEY")
+        try:
+            settings = get_settings()
+            self.api_url = settings.workers_ai_rerank_url or os.getenv(
+                "WORKERS_AI_RERANK_URL"
+            )
+            self.api_key = settings.workers_ai_api_key or os.getenv(
+                "WORKERS_AI_API_KEY"
+            )
+        except Exception:
+            self.api_url = os.getenv("WORKERS_AI_RERANK_URL")
+            self.api_key = os.getenv("WORKERS_AI_API_KEY")
         self.max_retries = 3
         self.retry_delay = 1
 

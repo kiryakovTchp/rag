@@ -1,17 +1,16 @@
-import os
-from pathlib import Path
-
-from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from api.config import init_settings
 from api.metrics import metrics_endpoint
 from api.middleware.auth import auth_middleware
 from api.routers.answer import router as answer_router
 from api.routers.auth import router as auth_router
+from api.routers.chunks import router as chunks_router
 from api.routers.feedback import router as feedback_router
 from api.routers.health import router as health_router
 from api.routers.ingest import router as ingest_router
+from api.routers.oauth import router as oauth_router
 from api.routers.query import router as query_router
 from api.websocket import router as websocket_router
 
@@ -21,9 +20,7 @@ from api.websocket import router as websocket_router
 #     instrument_sqlalchemy, instrument_logging, metrics_middleware
 # )
 
-# Load environment variables from .env file
-env_path = Path(__file__).parent.parent / ".env"
-load_dotenv(env_path)
+settings = init_settings()
 
 app = FastAPI(title="PromoAI RAG API")
 
@@ -35,20 +32,30 @@ app = FastAPI(title="PromoAI RAG API")
 # instrument_logging()
 
 # Configure CORS
-cors_origins = os.getenv(
-    "CORS_ORIGINS", "http://localhost:3000,http://localhost:5173"
-).split(",")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=cors_origins,
+    allow_origins=settings.cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Session middleware (required for OAuth state)
+try:
+    import os
+
+    from starlette.middleware.sessions import SessionMiddleware  # type: ignore
+
+    session_secret = os.getenv("SESSION_SECRET") or (
+        settings.nextauth_secret or "dev_session_secret"
+    )
+    app.add_middleware(SessionMiddleware, secret_key=session_secret)
+except Exception:
+    # Non-fatal in environments without sessions or missing dependency
+    pass
+
 # Add auth middleware to store user in request.state
-# Temporarily disabled for testing
-# app.middleware("http")(auth_middleware)
+app.middleware("http")(auth_middleware)
 
 # Add rate limiting middleware (temporarily disabled for testing)
 # app.middleware("http")(rate_limit_middleware)
@@ -63,13 +70,15 @@ app.include_router(answer_router, prefix="")
 app.include_router(websocket_router, prefix="")
 app.include_router(auth_router, prefix="")
 app.include_router(feedback_router, prefix="")
+app.include_router(oauth_router, prefix="")
+app.include_router(chunks_router, prefix="")
 
 # Add metrics endpoint
 app.add_api_route("/metrics", metrics_endpoint, methods=["GET"])
 
 # Include admin router only if explicitly enabled
-if os.getenv("ADMIN_API_ENABLED", "false").lower() == "true":
-    admin_token = os.getenv("ADMIN_API_TOKEN")
+if settings.admin_api_enabled:
+    admin_token = settings.admin_api_token
     if not admin_token:
         raise ValueError("ADMIN_API_ENABLED=true requires ADMIN_API_TOKEN to be set")
 

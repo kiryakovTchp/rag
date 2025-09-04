@@ -1,7 +1,7 @@
 """Hybrid retriever with dense search and optional reranking."""
 
 import os
-from typing import Optional
+from typing import Any, Optional
 
 # Lazy imports to prevent startup failures
 # from db.models import Chunk
@@ -77,7 +77,7 @@ class HybridRetriever:
 
         return results
 
-    def _get_chunks(self, chunk_ids: list[int]) -> list[Optional]:
+    def _get_chunks(self, chunk_ids: list[int]) -> list[Optional[Any]]:
         """Get chunks from database.
 
         Args:

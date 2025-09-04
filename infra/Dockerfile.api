@@ -10,6 +10,8 @@ RUN apt-get update && apt-get install -y \
 
 # Копируем requirements.txt, устанавливаем зависимости
 COPY requirements.txt ./
+COPY alembic.ini ./
+COPY alembic.ini /app/alembic.ini
 COPY .env ./
 ENV PIP_ONLY_BINARY=tokenizers,numpy,sentencepiece
 RUN pip install --no-cache-dir -r requirements.txt
@@ -25,8 +27,12 @@ COPY scripts/ /app/scripts/
 # Устанавливаем рабочую директорию
 WORKDIR /app
 
+# Создаем непривилегированного пользователя
+RUN adduser --disabled-password --gecos "" app && chown -R app:app /app
+USER app
+
 # Открываем порт
 EXPOSE 8000
 
 # Запускаем приложение
-CMD ["uvicorn", "api.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["bash", "-lc", "alembic upgrade head && uvicorn api.main:app --host 0.0.0.0 --port 8000"]

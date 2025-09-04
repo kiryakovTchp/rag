@@ -51,6 +51,25 @@ CACHE_HITS = Counter("cache_hits_total", "Total cache hits", ["cache_type"])
 
 CACHE_MISSES = Counter("cache_misses_total", "Total cache misses", ["cache_type"])
 
+# Connector metrics
+CONNECTOR_ERRORS = Counter(
+    "connector_errors_total",
+    "Total connector sync errors",
+    ["provider", "error_type"],
+)
+
+INDEXING_RATE = Counter(
+    "indexing_chunks_total",
+    "Total chunks indexed",
+    ["tenant_id", "provider"],
+)
+
+UNKNOWN_SOURCE_RATIO = Gauge(
+    "unknown_source_ratio",
+    "Ratio of chunks with unknown source metadata",
+    ["tenant_id"],
+)
+
 # Rate limit metrics
 RATE_LIMIT_EXCEEDED = Counter(
     "rate_limit_exceeded_total", "Total rate limit violations", ["user_id", "endpoint"]

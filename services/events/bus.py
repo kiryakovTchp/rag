@@ -3,6 +3,7 @@
 import asyncio
 import json
 import logging
+import os
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from typing import Any, Callable, Dict, Optional, Union
@@ -30,7 +31,8 @@ class EventBus:
         Args:
             redis_url: Redis connection URL. Defaults to REDIS_URL env var.
         """
-        self.redis_url = redis_url or "redis://localhost:6379"
+        # Prefer provided URL, fallback to env then default
+        self.redis_url = redis_url or os.getenv("REDIS_URL", "redis://localhost:6379")
         self._redis: Optional[redis.Redis] = None
         self._subscribers: Dict[str, asyncio.Task] = {}
 

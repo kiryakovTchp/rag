@@ -19,6 +19,7 @@ celery_app = Celery(
         "workers.tasks.parse",
         "workers.tasks.chunk",
         "workers.tasks.embed",
+        "workers.tasks.connectors",
     ],
 )
 

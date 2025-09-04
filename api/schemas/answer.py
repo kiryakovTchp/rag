@@ -12,7 +12,7 @@ class AnswerRequest(BaseModel):
     top_k: int = 10
     rerank: bool = False
     max_ctx: int = 4000
-    model: str = "gemini-pro"
+    model: str = "llama3:8b"
     temperature: float = 0.7
     max_tokens: int = 1000
     timeout_s: int = 60

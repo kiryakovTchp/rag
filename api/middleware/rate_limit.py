@@ -7,10 +7,16 @@ import redis.asyncio as redis
 from fastapi import Request, status
 from fastapi.responses import JSONResponse
 
+from api.config import get_settings
+
 # Redis connection
-redis_client = redis.Redis.from_url(
-    os.getenv("REDIS_URL", "redis://localhost:6379"), decode_responses=True
-)
+try:
+    settings = get_settings()
+    _redis_url = settings.redis_url or os.getenv("REDIS_URL", "redis://localhost:6379")
+except Exception:
+    _redis_url = os.getenv("REDIS_URL", "redis://localhost:6379")
+
+redis_client = redis.Redis.from_url(_redis_url, decode_responses=True)
 
 
 class RateLimiter:

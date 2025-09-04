@@ -5,9 +5,6 @@ from typing import List, Optional
 
 import numpy as np
 
-# Import only workers_ai embedder at module level
-from services.embed.workers_ai import WorkersAIEmbedder
-
 
 class EmbeddingProvider:
     """Embedding provider wrapper that switches between local and Workers AI."""
@@ -15,11 +12,12 @@ class EmbeddingProvider:
     def __init__(self, provider: Optional[str] = None):
         """Initialize embedding provider based on environment."""
         self.provider = provider or os.getenv(
-            "EMBED_PROVIDER", "workers_ai"
-        )  # Default to workers_ai for API
+            "EMBED_PROVIDER", "ollama"
+        )  # Default to ollama
         self.batch_size = int(os.getenv("EMBED_BATCH_SIZE", "64"))
         self._local_embedder = None
         self._workers_ai_embedder = None
+        self._ollama_embedder = None
 
     def _get_local_embedder(self):
         """Lazy load local embedder only when needed."""
@@ -36,10 +34,21 @@ class EmbeddingProvider:
         return self._local_embedder
 
     def _get_workers_ai_embedder(self):
-        """Lazy load workers AI embedder only when needed."""
+        """Lazy load Workers AI embedder only when needed."""
         if self._workers_ai_embedder is None:
+            # Lazy import to avoid dependency when not used
+            from services.embed.workers_ai import WorkersAIEmbedder
+
             self._workers_ai_embedder = WorkersAIEmbedder(batch_size=self.batch_size)
         return self._workers_ai_embedder
+
+    def _get_ollama_embedder(self):
+        """Lazy load Ollama embedder only when needed."""
+        if self._ollama_embedder is None:
+            from services.embed.ollama import OllamaEmbedder
+
+            self._ollama_embedder = OllamaEmbedder(batch_size=self.batch_size)
+        return self._ollama_embedder
 
     def embed_texts(self, texts: List[str]) -> np.ndarray:
         """Embed a list of texts.
@@ -54,6 +63,8 @@ class EmbeddingProvider:
             embedder = self._get_local_embedder()
         elif self.provider == "workers_ai":
             embedder = self._get_workers_ai_embedder()
+        elif self.provider == "ollama":
+            embedder = self._get_ollama_embedder()
         else:
             raise ValueError(f"Unknown embedding provider: {self.provider}")
 
@@ -78,8 +89,10 @@ class EmbeddingProvider:
         """
         if self.provider == "local":
             embedder = self._get_local_embedder()
-        else:
+        elif self.provider == "workers_ai":
             embedder = self._get_workers_ai_embedder()
+        else:
+            embedder = self._get_ollama_embedder()
         return embedder.get_dimension()
 
     def get_provider(self) -> str:

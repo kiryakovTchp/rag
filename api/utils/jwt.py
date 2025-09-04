@@ -6,50 +6,62 @@ from typing import Optional
 
 import jwt
 
-from db.models import User
+from api.config import get_settings
 
 
-def create_access_token(data: dict, expires_delta: Optional[int] = None) -> str:
+def _get_secret() -> str:
+    """Return JWT secret key.
+
+    Priority: JWT_SECRET_KEY, then NEXTAUTH_SECRET (for backward compatibility).
+    """
+    settings = get_settings()
+    return (
+        settings.jwt_secret_key
+        or settings.nextauth_secret
+        or os.getenv("JWT_SECRET_KEY")
+        or os.getenv("NEXTAUTH_SECRET")
+        or "dev_local_secret_change_me"
+    )
+
+
+def create_access_token(
+    user_id: int,
+    email: str,
+    tenant_id: Optional[str] = None,
+    role: str = "user",
+    expires_delta: Optional[int] = None,
+) -> str:
     """Create JWT access token.
 
     Args:
-        data: Data to encode in token
+        user_id: User ID
+        email: User email
+        tenant_id: Tenant ID
+        role: User role
         expires_delta: Token expiration time in seconds
 
     Returns:
         Encoded JWT token
     """
-    to_encode = data.copy()
+    to_encode = {
+        "sub": str(user_id),
+        "email": email,
+        "tenant_id": tenant_id,
+        "role": role,
+    }
 
-    if expires_delta:
-        expire = time.time() + expires_delta
-    else:
-        expire = time.time() + 3600  # 1 hour default
-
+    expire = time.time() + (expires_delta or 3600)
     to_encode.update({"exp": expire})
 
-    secret = os.getenv("JWT_SECRET_KEY")
-    if not secret:
-        raise ValueError("JWT_SECRET_KEY environment variable required")
-
+    secret = _get_secret()
     encoded_jwt = jwt.encode(to_encode, secret, algorithm="HS256")
     return str(encoded_jwt)
 
 
 def verify_token(token: str) -> Optional[dict]:
-    """Verify JWT token.
-
-    Args:
-        token: JWT token to verify
-
-    Returns:
-        Decoded token data or None if invalid
-    """
+    """Verify JWT token and return payload or None."""
     try:
-        secret = os.getenv("JWT_SECRET_KEY")
-        if not secret:
-            return None
-
+        secret = _get_secret()
         payload = jwt.decode(token, secret, algorithms=["HS256"])
         return payload
     except jwt.PyJWTError:
@@ -57,31 +69,5 @@ def verify_token(token: str) -> Optional[dict]:
 
 
 def decode_token(token: str) -> Optional[dict]:
-    """Decode JWT token (alias for verify_token).
-
-    Args:
-        token: JWT token to decode
-
-    Returns:
-        Decoded token data or None if invalid
-    """
+    """Decode JWT token (alias for verify_token)."""
     return verify_token(token)
-
-
-def create_user_token(user: User) -> str:
-    """Create JWT token for user.
-
-    Args:
-        user: User object
-
-    Returns:
-        JWT token string
-    """
-    token_data = {
-        "user_id": str(user.id),
-        "tenant_id": user.tenant_id,
-        "email": user.email,
-        "role": user.role,
-    }
-
-    return create_access_token(token_data)

@@ -48,7 +48,9 @@ export function useJobsWebSocket({
     try {
       setState(prev => ({ ...prev, status: 'connecting' }))
       
-      const url = tenantId ? `${wsUrl}/ws/jobs?tenant_id=${tenantId}` : `${wsUrl}/ws/jobs`
+      const token = localStorage.getItem('auth_token')
+      const base = tenantId ? `${wsUrl}/ws/jobs?tenant_id=${tenantId}` : `${wsUrl}/ws/jobs`
+      const url = token ? `${base}${base.includes('?') ? '&' : '?'}token=${encodeURIComponent(token)}` : base
       const ws = new WebSocket(url)
       
       ws.onopen = () => {

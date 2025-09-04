@@ -1,22 +1,18 @@
 import { useState, useEffect, useRef } from 'react'
-import { useSession } from 'next-auth/react'
 
 export function useWebSocket(url: string) {
-  const { data: session } = useSession()
   const [messages, setMessages] = useState<string[]>([])
   const [connected, setConnected] = useState(false)
   const wsRef = useRef<WebSocket | null>(null)
-  const reconnectTimeoutRef = useRef<NodeJS.Timeout | null>(null)
+  const reconnectTimeoutRef = useRef<number | null>(null)
 
   useEffect(() => {
-    if (!session?.accessToken) {
-      setConnected(false)
-      return
-    }
-
     const connect = () => {
       try {
-        const wsUrl = `${process.env.NEXT_PUBLIC_WS_URL || 'ws://localhost:8000'}${url}?token=${session.accessToken}`
+        const base = import.meta.env.VITE_WS_URL || 'ws://localhost:8000'
+        const token = localStorage.getItem('auth_token')
+        const authQuery = token ? `?token=${encodeURIComponent(token)}` : ''
+        const wsUrl = `${base}${url}${authQuery}`
         const ws = new WebSocket(wsUrl)
         
         ws.onopen = () => {
@@ -33,7 +29,7 @@ export function useWebSocket(url: string) {
           setConnected(false)
           
           // Reconnect after 5 seconds
-          reconnectTimeoutRef.current = setTimeout(() => {
+          reconnectTimeoutRef.current = window.setTimeout(() => {
             connect()
           }, 5000)
         }
@@ -56,11 +52,9 @@ export function useWebSocket(url: string) {
       if (wsRef.current) {
         wsRef.current.close()
       }
-      if (reconnectTimeoutRef.current) {
-        clearTimeout(reconnectTimeoutRef.current)
-      }
+      if (reconnectTimeoutRef.current !== null) window.clearTimeout(reconnectTimeoutRef.current)
     }
-  }, [url, session?.accessToken])
+  }, [url])
 
   const sendMessage = (message: string) => {
     if (wsRef.current && wsRef.current.readyState === WebSocket.OPEN) {

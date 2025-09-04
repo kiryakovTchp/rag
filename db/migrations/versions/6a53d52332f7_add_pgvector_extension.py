@@ -22,18 +22,7 @@ def upgrade() -> None:
     # Create pgvector extension
     op.execute("CREATE EXTENSION IF NOT EXISTS vector")
 
-    # Create index on embeddings vector column if table exists
-    op.execute(
-        """
-        CREATE INDEX IF NOT EXISTS idx_embeddings_vector 
-        ON embeddings USING ivfflat (vector vector_cosine_ops)
-    """
-    )
-
 
 def downgrade() -> None:
     """Downgrade schema."""
-    # Drop index
-    op.execute("DROP INDEX IF EXISTS idx_embeddings_vector")
-
     # Note: We don't drop the vector extension as it might be used by other tables

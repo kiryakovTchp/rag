@@ -72,7 +72,7 @@ export function Chat() {
           query: input,
           top_k: 10,
           rerank: true,
-          max_ctx_tokens: 2000
+          max_ctx: 2000
         })
       })
 
